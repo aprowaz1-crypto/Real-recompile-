@@ -359,4 +359,34 @@ using namespace arch;\
 #endif' "${SDK_DIR}/src/runtime/mmio_handler.cpp"
 echo "  13. Added 'using namespace arch' for ARM64 in mmio_handler.cpp"
 
+# ---- 9. Fix Android linker: no -lpthread, no -lrt (bionic includes them) ----
+echo "Fixing Android linker flags (-lpthread, -lrt)..."
+
+# Remove -lrt from all CMake files (clock functions are in bionic libc)
+find "${SDK_DIR}" \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
+  -exec sed -i 's/ -lrt\b//g; s/-lrt //g; s/"rt"//g' {} +
+echo "  14. Removed -lrt from CMake files"
+
+# Remove explicit -lpthread linkage (bionic includes pthreads)
+find "${SDK_DIR}" \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
+  -exec sed -i 's/ -lpthread//g; s/-lpthread //g; s/"pthread"//g' {} +
+echo "  15. Removed -lpthread from CMake files"
+
+# ---- 10. Skip building rexglue executable on Android (it's a host-only CLI tool) ----
+if [ -f "${SDK_DIR}/src/rexglue/CMakeLists.txt" ]; then
+  # Wrap entire file content in if(NOT ANDROID)
+  sed -i '1i if(NOT ANDROID)' "${SDK_DIR}/src/rexglue/CMakeLists.txt"
+  echo 'endif()' >> "${SDK_DIR}/src/rexglue/CMakeLists.txt"
+  echo "  16. Skipped rexglue executable on Android"
+fi
+
+# Also fix install cmake to not require rexglue executable on Android
+if [ -f "${SDK_DIR}/cmake/rexglue_install.cmake" ]; then
+  sed -i 's/    # CLI tool/    # CLI tool (skip on Android)/' "${SDK_DIR}/cmake/rexglue_install.cmake"
+  sed -i '/rexglue$/{ /SDL2/!{ s/^/# / } }' "${SDK_DIR}/cmake/rexglue_install.cmake"
+  # Wrap the rexglue binary install in if(NOT ANDROID)
+  sed -i 's/^\(.*\)rexglue$/if(NOT ANDROID)\n\1rexglue\nendif()/' "${SDK_DIR}/cmake/rexglue_install.cmake"
+  echo "  17. Patched install cmake to skip rexglue on Android"
+fi
+
 echo "=== All patches complete ==="
