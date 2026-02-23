@@ -31,10 +31,24 @@ print("  3. Added Android platform detection")
 
 
 # On Android, SDL2 creates conflicting export sets (ndk-modules).
-# Remove install(EXPORT ...) that references SDL2-static targets.
-import re
-text = re.sub(r'install\(EXPORT\s+rexglueTargets[^)]*\)', '# install(EXPORT rexglueTargets) - disabled for Android', text)
-print("  3b. Disabled install(EXPORT rexglueTargets) to fix SDL2 conflict")
+# Fix: disable SDL2 install in thirdparty/CMakeLists.txt
+tp_f = "${SDK_DIR}/thirdparty/CMakeLists.txt"
+tp_text = open(tp_f).read()
+tp_text = tp_text.replace(
+    'set(SDL2_DISABLE_INSTALL OFF CACHE BOOL "" FORCE)',
+    'set(SDL2_DISABLE_INSTALL ON CACHE BOOL "" FORCE)  # Android: disable to avoid export conflict')
+open(tp_f, 'w').write(tp_text)
+print("  3b. Disabled SDL2 install in thirdparty/CMakeLists.txt")
+
+# Also add SDL2-static to rexglue export targets since SDL2 won't install its own
+install_f = "${SDK_DIR}/cmake/rexglue_install.cmake"
+itext = open(install_f).read()
+# Add SDL2-static to the install targets list so it's in the rexglue export set
+itext = itext.replace(
+    'rexglue\n)',
+    'rexglue\n    SDL2-static\n)')
+open(install_f, 'w').write(itext)
+print("  3c. Added SDL2-static to rexglue install targets")
 
 open(f, 'w').write(text)
 PYEOF
