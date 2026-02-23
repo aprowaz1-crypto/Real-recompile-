@@ -179,19 +179,23 @@ PYEOF
 cat > "${SDK_DIR}/include/rex/main_android.h" << 'HEOF'
 #pragma once
 // Android main stub for ReXGlue SDK
-// Provides Android-specific thread naming via pthread/prctl
 #if defined(__ANDROID__) || defined(REX_PLATFORM_ANDROID)
 #include <android/log.h>
+#include <android/api-level.h>
 #include <sys/prctl.h>
 #include <jni.h>
 
 namespace rex {
-// Android doesn't need the elaborate thread naming from main_android.h
-// Thread naming is handled via prctl(PR_SET_NAME, ...) in threading.cpp
+
+// Return the Android API level at runtime
+inline int GetAndroidApiLevel() {
+    return android_get_device_api_level();
+}
+
 }  // namespace rex
 #endif
 HEOF
-echo "  9. Created rex/main_android.h stub"
+echo "  9. Created rex/main_android.h with GetAndroidApiLevel()"
 
 # 5d. Replace std::jthread / std::stop_token with std::thread + atomic<bool> in timer_queue.cpp
 python3 << PYEOF
@@ -241,3 +245,58 @@ print("  10. Replaced std::jthread/stop_token with std::thread/atomic<bool> in t
 PYEOF
 
 echo "C++23 compatibility patches applied!"
+
+# ---- 6. Fix std::chrono::clock_cast in threading.cpp (not in NDK libc++) ----
+python3 << PYEOF
+f = "${SDK_DIR}/src/core/threading.cpp"
+text = open(f).read()
+
+# Replace std::chrono::clock_cast<GClock_>(due_time) with manual conversion
+# clock_cast converts between WinSystemClock and XSystemClock (guest clock)
+# We use clock_time_conversion directly since clock_cast may not exist
+text = text.replace(
+    'std::chrono::clock_cast<GClock_>(due_time)',
+    'std::chrono::clock_time_conversion<GClock_, WClock_>{}(due_time)')
+
+open(f, 'w').write(text)
+print("  11. Replaced std::chrono::clock_cast with clock_time_conversion in threading.cpp")
+PYEOF
+
+# ---- 7. Fix NEON shift-by-variable in memory.h ----
+# On ARM64, vshlq_n / vshrq_n require compile-time constant shift amounts.
+# Replace simde_mm_slli_epi64(a, shift) with runtime-shift-capable equivalent.
+python3 << PYEOF
+f = "${SDK_DIR}/include/rex/runtime/guest/memory.h"
+text = open(f).read()
+
+# Replace the simde_mm_vsl function that uses runtime shift with NEON-safe code
+old_vsl = '''inline simde__m128i simde_mm_vsl(simde__m128i a, simde__m128i b) {
+    int shift = simde_mm_extract_epi8(b, 15) & 0x7;  // Get low 3 bits from byte 15 (BE: byte 0)
+    if (shift == 0) return a;
+    // Split into high and low 64-bit parts
+    simde__m128i low_shifted = simde_mm_slli_epi64(a, shift);
+    simde__m128i high_carry = simde_mm_srli_epi64(a, 64 - shift);
+    // Shift the carry from low qword to high qword position
+    high_carry = simde_mm_slli_si128(high_carry, 8);
+    return simde_mm_or_si128(low_shifted, high_carry);
+}'''
+
+new_vsl = '''inline simde__m128i simde_mm_vsl(simde__m128i a, simde__m128i b) {
+    int shift = simde_mm_extract_epi8(b, 15) & 0x7;
+    if (shift == 0) return a;
+    // Use runtime-safe shift via simde_mm_sll_epi64 (takes __m128i shift count)
+    simde__m128i shift_v = simde_mm_cvtsi64_si128(shift);
+    simde__m128i inv_shift_v = simde_mm_cvtsi64_si128(64 - shift);
+    simde__m128i low_shifted = simde_mm_sll_epi64(a, shift_v);
+    simde__m128i high_carry = simde_mm_srl_epi64(a, inv_shift_v);
+    high_carry = simde_mm_slli_si128(high_carry, 8);
+    return simde_mm_or_si128(low_shifted, high_carry);
+}'''
+
+text = text.replace(old_vsl, new_vsl)
+
+open(f, 'w').write(text)
+print("  12. Fixed NEON shift-by-variable in memory.h (use sll/srl_epi64)")
+PYEOF
+
+echo "All Android ARM64 patches applied!"
