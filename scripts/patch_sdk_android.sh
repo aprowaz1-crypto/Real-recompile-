@@ -197,6 +197,14 @@ inline int GetAndroidApiLevel() {
 HEOF
 echo "  9. Created rex/main_android.h with GetAndroidApiLevel()"
 
+# 5e. Add #include <rex/main_android.h> to any .cpp file that uses GetAndroidApiLevel
+find "${SDK_DIR}/src" -name '*.cpp' -exec grep -l 'GetAndroidApiLevel' {} \; | while read srcfile; do
+    if ! grep -q 'main_android.h' "$srcfile"; then
+        sed -i '/#include <rex\/platform.h>/a #include <rex/main_android.h>' "$srcfile"
+        echo "  9b. Added main_android.h include to $(basename $srcfile)"
+    fi
+done
+
 # 5d. Replace std::jthread / std::stop_token with std::thread + atomic<bool> in timer_queue.cpp
 python3 << PYEOF
 f = "${SDK_DIR}/src/core/timer_queue.cpp"
