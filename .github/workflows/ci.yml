@@ -121,6 +121,14 @@ jobs:
         continue-on-error: true
         run: ENABLE_RUNNER=ON ./scripts/build_generated_wine.sh
 
+      - name: Build generated native runner
+        if: steps.check_xex.outputs.exists == 'true'
+        run: ENABLE_RUNNER=ON ./scripts/build_generated_native.sh
+
+      - name: Runner smoke test
+        if: steps.check_xex.outputs.exists == 'true'
+        run: ./scripts/smoke_runner.sh
+
       - name: Upload analysis artifacts
         if: steps.check_xex.outputs.exists == 'true'
         uses: actions/upload-artifact@v4

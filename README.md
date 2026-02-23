@@ -23,6 +23,11 @@ Artifacts uploaded by CI:
 - `reports`
 - `generated-runner-windows` (`recompiled_runner.exe`, best-effort)
 
+Runner smoke in CI:
+- builds native `recompiled_runner`
+- applies preset and validates persisted config
+- stores smoke config in `artifacts/reports/runner_smoke_settings.ini`
+
 ## Full one-command pipeline
 
 If you have `default.xex`, run everything in one command:
@@ -146,6 +151,16 @@ Optional runner executable:
 ```bash
 ENABLE_RUNNER=ON ./scripts/build_generated_native.sh
 ENABLE_RUNNER=ON ./scripts/build_generated_wine.sh
+```
+
+Runner settings commands:
+
+```bash
+./build/generated-linux/recompiled_runner --print-settings
+./build/generated-linux/recompiled_runner --settings
+./build/generated-linux/recompiled_runner --apply-preset high
+./build/generated-linux/recompiled_runner --reset-defaults
+./build/generated-linux/recompiled_runner --config config/settings.ini --apply-preset medium
 ```
 
 Notes:

@@ -1,6 +1,7 @@
 #include "settings.h"
 
 #include <algorithm>
+#include <cctype>
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -42,8 +43,78 @@ T clamp(T value, T low, T high) {
 
 } // namespace
 
+Settings default_settings() {
+  return Settings{};
+}
+
+bool parse_quality_preset(const std::string& value, QualityPreset& out) {
+  std::string v = value;
+  std::transform(v.begin(), v.end(), v.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+
+  if (v == "low") {
+    out = QualityPreset::Low;
+    return true;
+  }
+  if (v == "medium") {
+    out = QualityPreset::Medium;
+    return true;
+  }
+  if (v == "high") {
+    out = QualityPreset::High;
+    return true;
+  }
+  if (v == "ultra") {
+    out = QualityPreset::Ultra;
+    return true;
+  }
+  return false;
+}
+
+const char* quality_preset_name(QualityPreset preset) {
+  switch (preset) {
+    case QualityPreset::Low: return "low";
+    case QualityPreset::Medium: return "medium";
+    case QualityPreset::High: return "high";
+    case QualityPreset::Ultra: return "ultra";
+  }
+  return "unknown";
+}
+
+void apply_quality_preset(Settings& settings, QualityPreset preset) {
+  switch (preset) {
+    case QualityPreset::Low:
+      settings.width = 960;
+      settings.height = 540;
+      settings.vsync = false;
+      settings.render_scale = 0.75f;
+      break;
+    case QualityPreset::Medium:
+      settings.width = 1280;
+      settings.height = 720;
+      settings.vsync = true;
+      settings.render_scale = 1.0f;
+      break;
+    case QualityPreset::High:
+      settings.width = 1920;
+      settings.height = 1080;
+      settings.vsync = true;
+      settings.render_scale = 1.25f;
+      break;
+    case QualityPreset::Ultra:
+      settings.width = 2560;
+      settings.height = 1440;
+      settings.vsync = true;
+      settings.render_scale = 1.5f;
+      break;
+  }
+}
+
+void reset_to_defaults(Settings& settings) {
+  settings = default_settings();
+}
+
 Settings load_settings(const std::string& path) {
-  Settings settings{};
+  Settings settings = default_settings();
   std::ifstream in(path);
   if (!in.is_open()) {
     return settings;
@@ -115,7 +186,9 @@ void interactive_settings_menu(Settings& settings) {
     std::cout << "4) Master volume\n";
     std::cout << "5) Input deadzone\n";
     std::cout << "6) Render scale\n";
-    std::cout << "7) Show settings\n";
+    std::cout << "7) Apply quality preset\n";
+    std::cout << "8) Reset to defaults\n";
+    std::cout << "9) Show settings\n";
     std::cout << "0) Exit menu\n";
     std::cout << "Select: ";
 
@@ -160,6 +233,20 @@ void interactive_settings_menu(Settings& settings) {
       std::cin >> v;
       settings.render_scale = clamp<float>(v, 0.5f, 2.0f);
     } else if (choice == 7) {
+      std::string preset;
+      std::cout << "Preset (low/medium/high/ultra): ";
+      std::cin >> preset;
+      QualityPreset parsed{};
+      if (parse_quality_preset(preset, parsed)) {
+        apply_quality_preset(settings, parsed);
+        std::cout << "Applied preset: " << quality_preset_name(parsed) << '\n';
+      } else {
+        std::cout << "Unknown preset\n";
+      }
+    } else if (choice == 8) {
+      reset_to_defaults(settings);
+      std::cout << "Defaults restored\n";
+    } else if (choice == 9) {
       print_settings(settings);
     }
   }
