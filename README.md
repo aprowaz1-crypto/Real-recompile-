@@ -21,6 +21,7 @@ Artifacts uploaded by CI:
 - `analysis-artifacts`
 - `generated-sources`
 - `reports`
+- `generated-runner-windows` (`recompiled_runner.exe`, best-effort)
 
 ## Full one-command pipeline
 

@@ -116,6 +116,11 @@ jobs:
         continue-on-error: true
         run: ./scripts/build_generated_native.sh
 
+      - name: Build generated Windows runner (.exe)
+        if: steps.check_xex.outputs.exists == 'true'
+        continue-on-error: true
+        run: ENABLE_RUNNER=ON ./scripts/build_generated_wine.sh
+
       - name: Upload analysis artifacts
         if: steps.check_xex.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
@@ -136,3 +141,11 @@ jobs:
         with:
           name: reports
           path: artifacts/reports
+
+      - name: Upload generated runner exe
+        if: steps.check_xex.outputs.exists == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-runner-windows
+          path: build/generated-windows/recompiled_runner.exe
+          if-no-files-found: warn
