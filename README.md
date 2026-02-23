@@ -1,215 +1,86 @@
-# Real-recompile-
+# Real-recompile
 
-Toolkit for an **authorized** XenonRecomp workflow in GitHub Codespaces.
+Static recompilation of an Xbox 360 title using [rexglue-sdk](https://github.com/rexglue/rexglue-sdk) v0.1.2.
 
-## GitHub Actions (CI)
+ReXGlue converts Xbox 360 PowerPC code into portable C++ that compiles to a native x86-64 executable with full GPU/audio/input runtime support (Vulkan graphics, SDL2 input, XMA audio).
 
-Workflow file:
-- `.github/workflows/ci.yml`
+## Prerequisites
 
-Jobs:
-- `runtime-native` — builds Linux runtime targets
-- `runtime-wine` — builds Windows target with MinGW/Wine
-- `xenon-pipeline` — runs analyse/recompile, tries generated build, auto-fixes missing labels, retries build, uploads artifacts (only if `default.xex` exists in repo root)
+- **Clang 18+** (required by the SDK)
+- **CMake 3.25+** and **Ninja**
+- **GTK3** dev libraries (Linux)
+- **Vulkan** dev libraries
+- `default.xex` in project root
 
-To run manually:
-- GitHub → **Actions** → **CI** → **Run workflow**
-
-Artifacts uploaded by CI:
-- `runtime-linux`
-- `runtime-windows`
-- `analysis-artifacts`
-- `generated-sources`
-- `reports`
-- `generated-runner-windows` (`recompiled_runner.exe`, best-effort)
-
-Runner smoke in CI:
-- builds native `recompiled_runner`
-- applies preset and validates persisted config
-- stores smoke config in `artifacts/reports/runner_smoke_settings.ini`
-
-## Full one-command pipeline
-
-If you have `default.xex`, run everything in one command:
-
-If you only have one game file/archive, first extract `default.xex`:
+## Quick Start
 
 ```bash
-./scripts/extract_default_xex.sh /path/to/game_file
+# 1. Download rexglue-sdk
+./scripts/setup_rexglue_sdk.sh
+
+# 2. Generate C++ from XEX
+./scripts/codegen.sh
+
+# 3. Build
+./scripts/build.sh
+
+# 4. Run
+./build/realrecompile
 ```
 
-This will place file at:
-- `input/default.xex`
+## Project Structure
 
-Native Linux output:
-
-```bash
-./scripts/full_pipeline_native.sh /workspaces/Real-recompile-/input/default.xex https://github.com/<owner>/<repo>.git
+```
+├── default.xex                    # Xbox 360 executable (input)
+├── realrecompile_config.toml      # Codegen configuration
+├── generated/                     # rexglue-generated C++ (from codegen)
+│   ├── sources.cmake              # Auto-generated CMake source list
+│   ├── realrecompile_config.h     # PPC memory layout defines
+│   ├── realrecompile_init.cpp/h   # Function mapping table
+│   └── realrecompile_recomp.*.cpp # Recompiled PPC→x86 functions
+├── src/app/main.cpp               # Application entry point (GTK+/Vulkan)
+├── CMakeLists.txt                 # Build system
+├── CMakePresets.json              # Build presets (Debug/Release)
+├── scripts/
+│   ├── setup_rexglue_sdk.sh       # Download SDK
+│   ├── codegen.sh                 # Run code generation
+│   └── build.sh                   # Build executable
+└── third_party/rexglue-sdk/       # SDK (downloaded, gitignored)
 ```
 
-Windows (Wine-target) output:
+## How It Works
 
-```bash
-./scripts/full_pipeline_wine.sh /workspaces/Real-recompile-/input/default.xex https://github.com/<owner>/<repo>.git
+1. **Analysis**: `rexglue codegen` disassembles the XEX, discovers 17000+ functions, resolves branches and jump tables
+2. **Code generation**: Each PPC function is translated to a C++ function operating on a virtual PPC context
+3. **Compilation**: Generated C++ compiles with Clang to a ~31MB native executable
+4. **Runtime**: The rexglue runtime provides Xbox 360 kernel emulation, Vulkan-based GPU rendering, SDL2 input, and XMA audio decoding
+
+## CI
+
+GitHub Actions automatically:
+- Downloads rexglue-sdk v0.1.2
+- Runs codegen (if `default.xex` present)
+- Builds the Linux executable
+- Uploads the binary as an artifact
+
+## Configuration
+
+Edit `realrecompile_config.toml` for codegen options:
+
+```toml
+project_name = "realrecompile"
+file_path = "default.xex"
+out_directory_path = "generated"
+
+# Optimizations
+ctr_as_local = true
+cr_as_local = true
 ```
 
-Optional runner build:
+See the [rexglue-sdk docs](https://github.com/rexglue/rexglue-sdk) for all available options.
 
-```bash
-ENABLE_RUNNER=ON ./scripts/full_pipeline_native.sh /path/to/default.xex https://github.com/<owner>/<repo>.git
-ENABLE_RUNNER=ON ./scripts/full_pipeline_wine.sh /path/to/default.xex https://github.com/<owner>/<repo>.git
-```
+## Credits
 
-## PC + Wine runtime build
-
-Native Linux (PC):
-
-```bash
-./scripts/build_runtime_native.sh
-./build/runtime-linux/runtime_smoke
-```
-
-Windows build for Wine:
-
-```bash
-./scripts/build_runtime_wine.sh
-wine ./build/runtime-windows/runtime_smoke.exe
-```
-
-Notes:
-- Native Linux build enables SDL2 platform wrappers (`gpu_wrapper` + `input_wrapper`).
-- Wine build defaults to wrappers `OFF` to avoid missing MinGW SDL2 packages in bare Codespaces.
-- If you install MinGW SDL2, set `-DBUILD_PLATFORM_WRAPPERS=ON` for Windows too.
-
-## 1) Environment setup (Codespaces)
-
-```bash
-chmod +x scripts/*.sh
-./scripts/setup_codespace.sh
-```
-
-Installs:
-- `cmake`, `ninja-build`
-- `clang`, `llvm`
-- `libcapstone-dev`
-- `git`, `git-lfs`, `pkg-config`
-- `libsdl2-dev`
-
-## 2) Clone + build XenonAnalyse / XenonRecomp
-
-```bash
-export XENON_REPO_URL="https://github.com/<owner>/<repo>.git"
-./scripts/build_xenon_tools.sh
-```
-
-Optional env vars:
-- `XENON_SRC_DIR` (default: `third_party/xenonrecomp`)
-- `XENON_BUILD_DIR` (default: `build/xenonrecomp`)
-- `XENON_BRANCH` (optional)
-
-## 3) Binary analysis
-
-```bash
-./scripts/analyse_xex.sh /path/to/default.xex
-```
-
-Output:
-- `artifacts/analysis/functions.toml`
-- `artifacts/analysis/jump_table.toml`
-
-## 4) Recompiler code generation
-
-```bash
-./scripts/recompile_xex.sh /path/to/default.xex
-```
-
-Output:
-- Generated C++ goes to `artifacts/generated/`
-
-If your XenonRecomp build uses different CLI flags, pass custom args:
-
-```bash
-XENON_RECOMP_ARGS="<your tool args>" ./scripts/recompile_xex.sh /path/to/default.xex
-```
-
-## 4.1) Build generated C++ in one command
-
-Native Linux build (links generated C++ with runtime/platform):
-
-```bash
-./scripts/build_generated_native.sh
-```
-
-Windows build for Wine (links generated C++ with runtime):
-
-```bash
-./scripts/build_generated_wine.sh
-```
-
-Optional runner executable:
-
-```bash
-ENABLE_RUNNER=ON ./scripts/build_generated_native.sh
-ENABLE_RUNNER=ON ./scripts/build_generated_wine.sh
-```
-
-Runner settings commands:
-
-```bash
-./build/generated-linux/recompiled_runner --print-settings
-./build/generated-linux/recompiled_runner --settings
-./build/generated-linux/recompiled_runner --apply-preset high
-./build/generated-linux/recompiled_runner --reset-defaults
-./build/generated-linux/recompiled_runner --config config/settings.ini --apply-preset medium
-```
-
-Note:
-- запуск `recompiled_runner` без аргументів відкриває консольне меню налаштувань і зберігає конфіг автоматично.
-
-Notes:
-- generated source dir default is `artifacts/generated`
-- override it with `GENERATED_DIR=/your/generated/path`
-
-## 5) Refactoring and fixing unimplemented instructions
-
-Use the helper files:
-- `src/runtime/ppc_unimplemented.h`
-- `src/runtime/ppc_unimplemented.cpp`
-
-Implemented examples (x64 intrinsics):
-- `cntlzw` via `_lzcnt_u32`
-- `popcntw` via `_mm_popcnt_u32`
-- `rlwinm` rotate-left + PPC mask
-- `fres_approx` via `_mm_rcp_ss`
-
-## 6) GPU/Input wrapper scaffolding
-
-Files:
-- `src/platform/gpu_wrapper.h`
-- `src/platform/gpu_wrapper.cpp`
-- `src/platform/input_wrapper.h`
-- `src/platform/input_wrapper.cpp`
-
-This gives a neutral platform layer for mapping:
-- Xenos-style draw flow to SDL2 renderer first (then upgrade to D3D/Vulkan/OpenGL)
-- XInput-like pad state to SDL GameController
-
-For a native Windows renderer path later:
-- keep `GpuWrapper` as abstraction boundary
-- add `GpuWrapperDx11`/`GpuWrapperDx12` implementation behind the same interface
-- keep gameplay/runtime code unchanged while swapping backend per platform
-
-## Typical flow
-
-```bash
-./scripts/setup_codespace.sh
-./scripts/build_xenon_tools.sh
-./scripts/analyse_xex.sh /workspace/game/default.xex
-./scripts/recompile_xex.sh /workspace/game/default.xex
-./scripts/build_generated_native.sh
-```
-
-## Notes
-
-- Use this only for binaries you own or are licensed to process.
-- The exact XenonRecomp CLI differs by fork/commit; scripts expose override env vars for that.
+- [ReXGlue](https://github.com/rexglue/rexglue-sdk) — Xbox 360 static recompilation SDK
+- [Xenia](https://github.com/xenia-project) — Xbox 360 emulation research
+- [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) — Static recompilation pioneer

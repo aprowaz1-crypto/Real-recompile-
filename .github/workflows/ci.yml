@@ -9,58 +9,75 @@ on:
 permissions:
   contents: read
 
+env:
+  REXGLUE_SDK_VERSION: v0.1.2
+  SDK_URL_LINUX: https://github.com/rexglue/rexglue-sdk/releases/download/v0.1.2/rexglue-sdk-linux-amd64.zip
+  SDK_URL_WIN: https://github.com/rexglue/rexglue-sdk/releases/download/v0.1.2/rexglue-sdk-win-amd64.zip
+
 jobs:
-  runtime-native:
-    name: Runtime Native (Linux)
+  build-linux:
+    name: Build Linux (Clang 18 + Vulkan)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Validate scripts
+      - name: Install system dependencies
         run: |
-          chmod +x scripts/*.sh
-          bash -n scripts/*.sh
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            clang-18 lld-18 ninja-build cmake \
+            libgtk-3-dev libvulkan-dev libx11-xcb-dev libxcb1-dev \
+            unzip
 
-      - name: Setup dependencies
-        run: ./scripts/setup_codespace.sh
+      - name: Cache rexglue-sdk
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: third_party/rexglue-sdk/linux-amd64
+          key: rexglue-sdk-linux-${{ env.REXGLUE_SDK_VERSION }}
 
-      - name: Build runtime (native)
-        run: ./scripts/build_runtime_native.sh
+      - name: Download rexglue-sdk
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p third_party/rexglue-sdk
+          curl -L -o /tmp/sdk.zip "$SDK_URL_LINUX"
+          unzip -qo /tmp/sdk.zip -d third_party/rexglue-sdk
+          rm /tmp/sdk.zip
 
-      - name: Upload native runtime build
+      - name: Codegen (generate C++ from XEX)
+        run: |
+          if [ -f "default.xex" ]; then
+            chmod +x third_party/rexglue-sdk/linux-amd64/bin/rexglue
+            third_party/rexglue-sdk/linux-amd64/bin/rexglue codegen realrecompile_config.toml
+          else
+            echo "default.xex not found, using pre-generated code"
+          fi
+
+      - name: Configure
+        run: |
+          cmake -B build -G Ninja \
+            -DCMAKE_C_COMPILER=clang-18 \
+            -DCMAKE_CXX_COMPILER=clang++-18 \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build -j$(nproc)
+
+      - name: Verify executable
+        run: |
+          file build/realrecompile
+          ls -lh build/realrecompile
+
+      - name: Upload Linux binary
         uses: actions/upload-artifact@v4
         with:
-          name: runtime-linux
-          path: build/runtime-linux
+          name: realrecompile-linux-amd64
+          path: build/realrecompile
 
-  runtime-wine:
-    name: Runtime Windows (MinGW/Wine)
+  codegen-only:
+    name: Codegen Pipeline
     runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Validate scripts
-        run: |
-          chmod +x scripts/*.sh
-          bash -n scripts/*.sh
-
-      - name: Build runtime (wine target)
-        run: ./scripts/build_runtime_wine.sh
-
-      - name: Upload windows runtime build
-        uses: actions/upload-artifact@v4
-        with:
-          name: runtime-windows
-          path: build/runtime-windows
-
-  xenon-pipeline:
-    name: Xenon Pipeline (Generate C++)
-    runs-on: ubuntu-24.04
-    env:
-      XEX_PATH: default.xex
-      XENON_REPO_URL: https://github.com/hedge-dev/XenonRecomp.git
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -68,92 +85,38 @@ jobs:
       - name: Check XEX presence
         id: check_xex
         run: |
-          if [ -f "$XEX_PATH" ]; then
+          if [ -f "default.xex" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
-            echo "[info] default.xex is missing, skipping xenon-pipeline steps"
+            echo "[info] default.xex is missing, skipping codegen"
           fi
 
-      - name: Validate scripts
+      - name: Cache rexglue-sdk
+        if: steps.check_xex.outputs.exists == 'true'
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: third_party/rexglue-sdk/linux-amd64
+          key: rexglue-sdk-linux-${{ env.REXGLUE_SDK_VERSION }}
+
+      - name: Download rexglue-sdk
+        if: steps.check_xex.outputs.exists == 'true' && steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p third_party/rexglue-sdk
+          curl -L -o /tmp/sdk.zip "$SDK_URL_LINUX"
+          unzip -qo /tmp/sdk.zip -d third_party/rexglue-sdk
+          rm /tmp/sdk.zip
+
+      - name: Run codegen
         if: steps.check_xex.outputs.exists == 'true'
         run: |
-          chmod +x scripts/*.sh
-          bash -n scripts/*.sh
-
-      - name: Setup dependencies
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ./scripts/setup_codespace.sh
-
-      - name: Build Xenon tools
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ./scripts/build_xenon_tools.sh
-
-      - name: Analyse XEX
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ./scripts/analyse_xex.sh "$XEX_PATH"
-
-      - name: Recompile XEX
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ./scripts/recompile_xex.sh "$XEX_PATH"
-
-      - name: Find unimplemented
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ./scripts/find_unimplemented.sh
-
-      - name: Build generated target
-        id: build_generated
-        if: steps.check_xex.outputs.exists == 'true'
-        continue-on-error: true
-        run: ./scripts/build_generated_native.sh
-
-      - name: Auto-fix generated labels
-        if: steps.check_xex.outputs.exists == 'true' && steps.build_generated.outcome == 'failure'
-        run: ./scripts/fix_generated_labels.sh
-
-      - name: Retry generated build
-        if: steps.check_xex.outputs.exists == 'true' && steps.build_generated.outcome == 'failure'
-        continue-on-error: true
-        run: ./scripts/build_generated_native.sh
-
-      - name: Build generated Windows runner (.exe)
-        if: steps.check_xex.outputs.exists == 'true'
-        continue-on-error: true
-        run: ENABLE_RUNNER=ON ./scripts/build_generated_wine.sh
-
-      - name: Build generated native runner
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ENABLE_RUNNER=ON ./scripts/build_generated_native.sh
-
-      - name: Runner smoke test
-        if: steps.check_xex.outputs.exists == 'true'
-        run: ./scripts/smoke_runner.sh
-
-      - name: Upload analysis artifacts
-        if: steps.check_xex.outputs.exists == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: analysis-artifacts
-          path: artifacts/analysis
+          chmod +x third_party/rexglue-sdk/linux-amd64/bin/rexglue
+          third_party/rexglue-sdk/linux-amd64/bin/rexglue codegen realrecompile_config.toml
 
       - name: Upload generated sources
         if: steps.check_xex.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: generated-sources
-          path: artifacts/generated
-
-      - name: Upload reports
-        if: steps.check_xex.outputs.exists == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: reports
-          path: artifacts/reports
-
-      - name: Upload generated runner exe
-        if: steps.check_xex.outputs.exists == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: generated-runner-windows
-          path: build/generated-windows/recompiled_runner.exe
-          if-no-files-found: warn
+          path: generated/

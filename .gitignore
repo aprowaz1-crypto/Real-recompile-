@@ -1,0 +1,16 @@
+# Build output
+build/
+out/
+
+# SDK binaries (downloaded at build time)
+third_party/rexglue-sdk/linux-amd64/
+third_party/rexglue-sdk/win-amd64/
+third_party/rexglue-sdk/*.zip
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Config
+config/settings.ini

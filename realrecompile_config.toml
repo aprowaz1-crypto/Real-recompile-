@@ -1,0 +1,13 @@
+# realrecompile - ReXGlue Codegen Configuration
+# See https://github.com/rexglue/rexglue-sdk for full reference.
+
+project_name = "realrecompile"
+file_path = "default.xex"
+out_directory_path = "generated"
+
+# Codegen optimizations
+skip_lr = false
+skip_msr = false
+ctr_as_local = true
+cr_as_local = true
+reserved_as_local = false
