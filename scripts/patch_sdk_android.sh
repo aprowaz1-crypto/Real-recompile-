@@ -45,8 +45,8 @@ install_f = "${SDK_DIR}/cmake/rexglue_install.cmake"
 itext = open(install_f).read()
 # Add SDL2-static to the install targets list so it's in the rexglue export set
 itext = itext.replace(
-    'rexglue\n)',
-    'rexglue\n    SDL2-static\n)')
+    '    # CLI tool\n    rexglue\n)',
+    '    # CLI tool\n    rexglue\n    SDL2-static\n)')
 open(install_f, 'w').write(itext)
 print("  3c. Added SDL2-static to rexglue install targets")
 
