@@ -131,6 +131,11 @@ jobs:
       - name: Install LLVM/Clang
         run: choco install llvm ninja -y --no-progress
 
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: amd64
+
       - name: Cache rexglue-sdk (Windows)
         id: cache-sdk-win
         uses: actions/cache@v4
@@ -151,10 +156,9 @@ jobs:
         shell: cmd
         run: |
           cmake -B build -G Ninja ^
-            -DCMAKE_C_COMPILER=clang ^
-            -DCMAKE_CXX_COMPILER=clang++ ^
-            -DCMAKE_BUILD_TYPE=Release ^
-            -DCMAKE_LINKER=lld-link
+            -DCMAKE_C_COMPILER=clang-cl ^
+            -DCMAKE_CXX_COMPILER=clang-cl ^
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build -j $env:NUMBER_OF_PROCESSORS

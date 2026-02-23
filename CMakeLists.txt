@@ -96,9 +96,11 @@ if(NOT MSVC)
     target_compile_options(realrecompile PRIVATE -msse4.1)
 endif()
 
-# SEH support on Windows
+# SEH support on Windows (clang-cl or MSVC)
 if(MSVC)
     target_compile_options(realrecompile PRIVATE /EHa)
+elseif(WIN32)
+    target_compile_options(realrecompile PRIVATE -fms-extensions -fexceptions)
 endif()
 
 # Windows-specific linking
@@ -110,13 +112,13 @@ if(WIN32)
         shell32 advapi32 user32 gdi32 imm32
         setupapi version shlwapi
     )
-    # Whole-archive for kernel hooks (MSVC)
-    if(MSVC)
-        target_link_options(realrecompile PRIVATE
-            /WHOLEARCHIVE:$<TARGET_FILE:rex::kernel>
-            /FORCE:UNRESOLVED
-        )
-    endif()
+    # Whole-archive for kernel hooks + ignore unresolved Xbox symbols
+    # Works for both clang-cl (MSVC=TRUE) and clang++ (GNU driver)
+    target_link_options(realrecompile PRIVATE
+        "LINKER:/WHOLEARCHIVE:$<TARGET_FILE:rex::kernel>"
+        "LINKER:/FORCE:UNRESOLVED"
+        "LINKER:/IGNORE:4217"
+    )
 endif()
 
 # ---------- Codegen convenience target ----------
