@@ -148,21 +148,16 @@ echo "SDK patched for Android ARM64 successfully!"
 # ---- 5. Patch C++23 compatibility for Android NDK libc++ ----
 echo "Patching C++23 compatibility for Android NDK..."
 
-# 5a. Replace std::move_only_function with std::function in timer_queue.h
-python3 << PYEOF
-f = "${SDK_DIR}/include/rex/thread/timer_queue.h"
-text = open(f).read()
-text = text.replace('std::move_only_function', 'std::function')
-open(f, 'w').write(text)
-print("  7. Replaced std::move_only_function with std::function in timer_queue.h")
-PYEOF
+# 5a. Replace std::move_only_function with std::function in ALL source files
+find "${SDK_DIR}/include" "${SDK_DIR}/src" -name '*.h' -o -name '*.hpp' -o -name '*.cpp' | \
+  xargs sed -i 's/std::move_only_function/std::function/g'
+echo "  7. Replaced std::move_only_function -> std::function globally"
 
 # 5b. Add clock_time_conversion forward declaration in chrono.h
 python3 << PYEOF
 f = "${SDK_DIR}/include/rex/time/chrono.h"
 text = open(f).read()
 
-# Insert forward declaration of clock_time_conversion before the specializations
 old = 'namespace std::chrono {\n\ntemplate <>\nstruct clock_time_conversion'
 new = '''namespace std::chrono {
 
@@ -178,6 +173,71 @@ struct clock_time_conversion'''
 text = text.replace(old, new, 1)
 open(f, 'w').write(text)
 print("  8. Added clock_time_conversion forward declaration in chrono.h")
+PYEOF
+
+# 5c. Create missing rex/main_android.h stub
+cat > "${SDK_DIR}/include/rex/main_android.h" << 'HEOF'
+#pragma once
+// Android main stub for ReXGlue SDK
+// Provides Android-specific thread naming via pthread/prctl
+#if defined(__ANDROID__) || defined(REX_PLATFORM_ANDROID)
+#include <android/log.h>
+#include <sys/prctl.h>
+#include <jni.h>
+
+namespace rex {
+// Android doesn't need the elaborate thread naming from main_android.h
+// Thread naming is handled via prctl(PR_SET_NAME, ...) in threading.cpp
+}  // namespace rex
+#endif
+HEOF
+echo "  9. Created rex/main_android.h stub"
+
+# 5d. Replace std::jthread / std::stop_token with std::thread + atomic<bool> in timer_queue.cpp
+python3 << PYEOF
+f = "${SDK_DIR}/src/core/timer_queue.cpp"
+text = open(f).read()
+
+# Add atomic include
+if '#include <atomic>' not in text:
+    text = text.replace('#include <algorithm>', '#include <algorithm>\n#include <atomic>')
+
+# Replace jthread constructor with thread + stop flag
+text = text.replace(
+    '''dispatch_thread_ = std::jthread([this](std::stop_token stop_token) {
+      TimerThreadMain(stop_token);
+    });''',
+    '''stop_requested_.store(false);
+    dispatch_thread_ = std::thread([this]() {
+      TimerThreadMain();
+    });''')
+
+# Replace destructor request_stop
+text = text.replace(
+    'dispatch_thread_.request_stop();',
+    'stop_requested_.store(true);')
+
+# Replace jthread auto-join comment with explicit join
+text = text.replace(
+    '// std::jthread auto-joins on destruction',
+    'if (dispatch_thread_.joinable()) dispatch_thread_.join();')
+
+# Replace TimerThreadMain signature
+text = text.replace(
+    'void TimerThreadMain(std::stop_token stop_token) {',
+    'void TimerThreadMain() {')
+
+# Replace stop_token.stop_requested()
+text = text.replace('stop_token.stop_requested()', 'stop_requested_.load()')
+
+# Replace jthread::id
+text = text.replace('std::jthread::id', 'std::thread::id')
+
+# Replace std::jthread member
+text = text.replace('std::jthread dispatch_thread_;', 'std::thread dispatch_thread_;\n  std::atomic<bool> stop_requested_{false};')
+
+open(f, 'w').write(text)
+print("  10. Replaced std::jthread/stop_token with std::thread/atomic<bool> in timer_queue.cpp")
 PYEOF
 
 echo "C++23 compatibility patches applied!"
