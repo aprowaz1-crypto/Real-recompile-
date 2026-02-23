@@ -110,6 +110,46 @@ namespace rex { namespace ui { /* Android stubs - surfaces managed by app */ } }
 CPPEOF
 echo "  5. Created surface_android_stub.cpp"
 
+# ---- 3b. Create missing rex/ui/surface_android.h header ----
+cat > "${SDK_DIR}/include/rex/ui/surface_android.h" << 'HEOF'
+#pragma once
+// Android Native Window surface for Vulkan (VK_KHR_android_surface)
+#if defined(__ANDROID__) || defined(REX_PLATFORM_ANDROID)
+
+#include <android/native_window.h>
+#include <rex/ui/surface.h>
+
+namespace rex {
+namespace ui {
+
+class AndroidNativeWindowSurface final : public Surface {
+ public:
+  explicit AndroidNativeWindowSurface(ANativeWindow* window)
+      : window_(window) {}
+  TypeIndex GetType() const override { return kTypeIndex_AndroidNativeWindow; }
+  ANativeWindow* window() const { return window_; }
+
+ protected:
+  bool GetSizeImpl(uint32_t& width_out, uint32_t& height_out) const override {
+    if (window_) {
+      width_out = ANativeWindow_getWidth(window_);
+      height_out = ANativeWindow_getHeight(window_);
+      return true;
+    }
+    return false;
+  }
+
+ private:
+  ANativeWindow* window_;
+};
+
+}  // namespace ui
+}  // namespace rex
+
+#endif
+HEOF
+echo "  5b. Created rex/ui/surface_android.h"
+
 # ---- 4. Patch thirdparty/CMakeLists.txt: exclude x86 FFmpeg on Android ----
 python3 << PYEOF
 f = "${SDK_DIR}/thirdparty/CMakeLists.txt"
