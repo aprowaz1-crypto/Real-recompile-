@@ -1,0 +1,14 @@
+[main]
+file_path = "../../default.xex"
+out_directory_path = "../generated"
+switch_table_file_path = "jump_table.toml"
+
+# Fill these per-game addresses for best results:
+# restgprlr_14_address = 0x0
+# savegprlr_14_address = 0x0
+# restfpr_14_address = 0x0
+# savefpr_14_address = 0x0
+# restvmx_14_address = 0x0
+# savevmx_14_address = 0x0
+# restvmx_64_address = 0x0
+# savevmx_64_address = 0x0

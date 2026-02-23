@@ -1,0 +1,7 @@
+artifacts/generated/ppc_context.h:53:// TODO: Implement.
+artifacts/generated/ppc_context.h:90:// TODO: Verify if that's always the case.
+artifacts/generated/ppc_recomp.57.cpp:24626:	__builtin_debugtrap();
+artifacts/generated/ppc_recomp.61.cpp:6126:	__builtin_debugtrap();
+artifacts/generated/ppc_recomp.61.cpp:6345:	__builtin_debugtrap();
+artifacts/generated/ppc_recomp.64.cpp:166:	__builtin_debugtrap();
+artifacts/generated/ppc_recomp.64.cpp:363:	__builtin_debugtrap();

@@ -29,6 +29,13 @@ text = text.replace(
     '    if(ANDROID)\n        set(REX_PLATFORM "android-arm64")\n        add_compile_definitions(REX_PLATFORM_ANDROID=1 REX_PLATFORM_LINUX=1)\n    else()\n        set(REX_PLATFORM "linux-amd64")\n        add_compile_definitions(REX_PLATFORM_LINUX=1)\n    endif()')
 print("  3. Added Android platform detection")
 
+
+# On Android, SDL2 creates conflicting export sets (ndk-modules).
+# Remove install(EXPORT ...) that references SDL2-static targets.
+import re
+text = re.sub(r'install\(EXPORT\s+rexglueTargets[^)]*\)', '# install(EXPORT rexglueTargets) - disabled for Android', text)
+print("  3b. Disabled install(EXPORT rexglueTargets) to fix SDL2 conflict")
+
 open(f, 'w').write(text)
 PYEOF
 

@@ -77,6 +77,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release \
             -DREXGLUE_USE_VULKAN=ON \
             -DREXGLUE_BUILD_TESTS=OFF \
+            -DSDL_INSTALL=OFF \
+            -DSDL2_DISABLE_INSTALL=ON \
+            -DSDL_TEST=OFF \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/third_party/rexglue-sdk/android-arm64
 
       - name: Build SDK for Android
@@ -89,7 +92,24 @@ jobs:
 
       - name: Install SDK
         if: steps.cache-sdk-android.outputs.cache-hit != 'true'
-        run: cmake --install /tmp/rexglue-sdk-build
+        run: |
+          cmake --install /tmp/rexglue-sdk-build || {
+            echo "::warning::cmake install had errors, manually copying artifacts..."
+            SDK_DEST="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
+            mkdir -p "$SDK_DEST/lib" "$SDK_DEST/include" "$SDK_DEST/share"
+            # Copy all built static libs
+            find /tmp/rexglue-sdk-build -name '*.a' -exec cp {} "$SDK_DEST/lib/" \;
+            # Copy SDK headers
+            if [ -d "/tmp/rexglue-sdk-src/include" ]; then
+              cp -r /tmp/rexglue-sdk-src/include/* "$SDK_DEST/include/"
+            fi
+            # Copy share directory (app templates, etc)
+            if [ -d "/tmp/rexglue-sdk-src/share" ]; then
+              cp -r /tmp/rexglue-sdk-src/share/* "$SDK_DEST/share/"
+            fi
+          }
+          echo "SDK installed to: ${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
+          ls -la "${{ github.workspace }}/third_party/rexglue-sdk/android-arm64/lib/" | head -20
 
       # ============================================
       # Step 2: Build the project against Android SDK
