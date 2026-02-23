@@ -356,3 +356,12 @@ print("  12. Fixed NEON shift-by-variable in memory.h (use sll/srl_epi64)")
 PYEOF
 
 echo "All Android ARM64 patches applied!"
+
+# ---- 8. Fix namespace for ARM64 arch constants in mmio_handler.cpp ----
+sed -i '/^namespace rex::runtime {/a \
+#if REX_ARCH_ARM64\
+using namespace arch;\
+#endif' "${SDK_DIR}/src/runtime/mmio_handler.cpp"
+echo "  13. Added 'using namespace arch' for ARM64 in mmio_handler.cpp"
+
+echo "=== All patches complete ==="
