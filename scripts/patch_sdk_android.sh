@@ -144,3 +144,40 @@ fi
 
 echo ""
 echo "SDK patched for Android ARM64 successfully!"
+
+# ---- 5. Patch C++23 compatibility for Android NDK libc++ ----
+echo "Patching C++23 compatibility for Android NDK..."
+
+# 5a. Replace std::move_only_function with std::function in timer_queue.h
+python3 << PYEOF
+f = "${SDK_DIR}/include/rex/thread/timer_queue.h"
+text = open(f).read()
+text = text.replace('std::move_only_function', 'std::function')
+open(f, 'w').write(text)
+print("  7. Replaced std::move_only_function with std::function in timer_queue.h")
+PYEOF
+
+# 5b. Add clock_time_conversion forward declaration in chrono.h
+python3 << PYEOF
+f = "${SDK_DIR}/include/rex/time/chrono.h"
+text = open(f).read()
+
+# Insert forward declaration of clock_time_conversion before the specializations
+old = 'namespace std::chrono {\n\ntemplate <>\nstruct clock_time_conversion'
+new = '''namespace std::chrono {
+
+// Forward-declare clock_time_conversion for NDK libc++ (C++20 feature not always available)
+#if !defined(__cpp_lib_chrono) || __cpp_lib_chrono < 201907L
+template <typename Dest, typename Source>
+struct clock_time_conversion {};
+#endif
+
+template <>
+struct clock_time_conversion'''
+
+text = text.replace(old, new, 1)
+open(f, 'w').write(text)
+print("  8. Added clock_time_conversion forward declaration in chrono.h")
+PYEOF
+
+echo "C++23 compatibility patches applied!"
