@@ -362,15 +362,35 @@ echo "  13. Added 'using namespace arch' for ARM64 in mmio_handler.cpp"
 # ---- 9. Fix Android linker: no -lpthread, no -lrt (bionic includes them) ----
 echo "Fixing Android linker flags (-lpthread, -lrt)..."
 
-# Remove -lrt from all CMake files (clock functions are in bionic libc)
-find "${SDK_DIR}" \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
-  -exec sed -i 's/ -lrt\b//g; s/-lrt //g; s/"rt"//g' {} +
-echo "  14. Removed -lrt from CMake files"
-
-# Remove explicit -lpthread linkage (bionic includes pthreads)
-find "${SDK_DIR}" \( -name "CMakeLists.txt" -o -name "*.cmake" \) \
-  -exec sed -i 's/ -lpthread//g; s/-lpthread //g; s/"pthread"//g' {} +
-echo "  15. Removed -lpthread from CMake files"
+# Remove -lrt and -lpthread from CMake files (bionic includes them)
+# Use Python for safer, targeted replacement
+python3 << PYEOF
+import os, re
+for root, dirs, files in os.walk("${SDK_DIR}"):
+    for fn in files:
+        if fn.endswith('.cmake') or fn == 'CMakeLists.txt':
+            path = os.path.join(root, fn)
+            text = open(path).read()
+            orig = text
+            # Remove -lpthread and -lrt linker flags
+            text = text.replace('-lpthread', '')
+            text = text.replace('-lrt', '')
+            text = text.replace('-pthread', '')  # also the gcc-style flag
+            # On Android, Threads::Threads is handled by bionic - remove find_package(Threads)
+            if 'ANDROID' not in path:  # don't modify android-specific cmake files
+                text = re.sub(r'find_package\(Threads\s+(REQUIRED\s*)?\\)', '', text)
+                text = re.sub(r'find_package\(Threads\s+REQUIRED\)', '', text)
+                text = re.sub(r'find_package\(Threads\)', '', text)
+            # Remove "pthread" and "rt" as standalone cmake arguments (quoted)
+            text = re.sub(r'"\s*pthread\s*"', '', text)
+            text = re.sub(r'"\s*rt\s*"', '', text)
+            # Remove bare pthread/rt only when on their own line (indented cmake arg)
+            text = re.sub(r'^\s+pthread\s*$', '', text, flags=re.MULTILINE)
+            text = re.sub(r'^\s+rt\s*$', '', text, flags=re.MULTILINE)
+            if text != orig:
+                open(path, 'w').write(text)
+                print(f"  14-15. Cleaned pthread/rt from {os.path.relpath(path, '${SDK_DIR}')}")
+PYEOF
 
 # ---- 10. Skip building rexglue executable on Android (it's a host-only CLI tool) ----
 if [ -f "${SDK_DIR}/src/rexglue/CMakeLists.txt" ]; then
@@ -380,13 +400,37 @@ if [ -f "${SDK_DIR}/src/rexglue/CMakeLists.txt" ]; then
   echo "  16. Skipped rexglue executable on Android"
 fi
 
-# Also fix install cmake to not require rexglue executable on Android
-if [ -f "${SDK_DIR}/cmake/rexglue_install.cmake" ]; then
-  sed -i 's/    # CLI tool/    # CLI tool (skip on Android)/' "${SDK_DIR}/cmake/rexglue_install.cmake"
-  sed -i '/rexglue$/{ /SDL2/!{ s/^/# / } }' "${SDK_DIR}/cmake/rexglue_install.cmake"
-  # Wrap the rexglue binary install in if(NOT ANDROID)
-  sed -i 's/^\(.*\)rexglue$/if(NOT ANDROID)\n\1rexglue\nendif()/' "${SDK_DIR}/cmake/rexglue_install.cmake"
-  echo "  17. Patched install cmake to skip rexglue on Android"
-fi
+# Fix install cmake to not require rexglue executable on Android
+# The install(TARGETS ...) list cannot have if() inside it, so we use
+# a Python script to properly remove rexglue from the targets list on Android
+python3 << PYEOF
+import re
+
+f = "${SDK_DIR}/cmake/rexglue_install.cmake"
+text = open(f).read()
+
+# Strategy: remove 'rexglue' from the install(TARGETS ...) list
+# and add a separate conditional install for it
+# Match lines like "    rexglue\n" inside install() blocks - remove them
+text = text.replace('    rexglue\n    SDL2-static', '    SDL2-static')
+
+# Also handle if rexglue is on its own line without SDL2-static after
+text = text.replace('    rexglue\n)', ')')
+
+# Add conditional rexglue install at the end
+text += '''
+# Install rexglue CLI tool only on non-Android platforms
+if(NOT ANDROID)
+  if(TARGET rexglue)
+    install(TARGETS rexglue
+      EXPORT rexglue-targets
+      RUNTIME DESTINATION bin)
+  endif()
+endif()
+'''
+
+open(f, 'w').write(text)
+print("  17. Properly fixed install cmake for Android (removed rexglue from TARGETS list)")
+PYEOF
 
 echo "=== All patches complete ==="
