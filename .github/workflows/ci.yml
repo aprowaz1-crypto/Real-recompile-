@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  runtime-native:
+    name: Runtime Native (Linux)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate scripts
+        run: |
+          chmod +x scripts/*.sh
+          bash -n scripts/*.sh
+
+      - name: Setup dependencies
+        run: ./scripts/setup_codespace.sh
+
+      - name: Build runtime (native)
+        run: ./scripts/build_runtime_native.sh
+
+      - name: Upload native runtime build
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-linux
+          path: build/runtime-linux
+
+  runtime-wine:
+    name: Runtime Windows (MinGW/Wine)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate scripts
+        run: |
+          chmod +x scripts/*.sh
+          bash -n scripts/*.sh
+
+      - name: Build runtime (wine target)
+        run: ./scripts/build_runtime_wine.sh
+
+      - name: Upload windows runtime build
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-windows
+          path: build/runtime-windows
+
+  xenon-pipeline:
+    name: Xenon Pipeline (Generate C++)
+    runs-on: ubuntu-24.04
+    if: ${{ hashFiles('default.xex') != '' }}
+    env:
+      XEX_PATH: /home/runner/work/Real-recompile-/Real-recompile-/default.xex
+      XENON_REPO_URL: https://github.com/hedge-dev/XenonRecomp.git
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate scripts
+        run: |
+          chmod +x scripts/*.sh
+          bash -n scripts/*.sh
+
+      - name: Setup dependencies
+        run: ./scripts/setup_codespace.sh
+
+      - name: Build Xenon tools
+        run: ./scripts/build_xenon_tools.sh
+
+      - name: Analyse XEX
+        run: ./scripts/analyse_xex.sh "$XEX_PATH"
+
+      - name: Recompile XEX
+        run: ./scripts/recompile_xex.sh "$XEX_PATH"
+
+      - name: Find unimplemented
+        run: ./scripts/find_unimplemented.sh
+
+      - name: Build generated target
+        id: build_generated
+        continue-on-error: true
+        run: ./scripts/build_generated_native.sh
+
+      - name: Auto-fix generated labels
+        if: steps.build_generated.outcome == 'failure'
+        run: ./scripts/fix_generated_labels.sh
+
+      - name: Retry generated build
+        if: steps.build_generated.outcome == 'failure'
+        continue-on-error: true
+        run: ./scripts/build_generated_native.sh
+
+      - name: Upload analysis artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: analysis-artifacts
+          path: artifacts/analysis
+
+      - name: Upload generated sources
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-sources
+          path: artifacts/generated
+
+      - name: Upload reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports
+          path: artifacts/reports
