@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.realrecompile.app"
+    android:versionCode="1"
+    android:versionName="1.0">
+
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="34" />
+
+    <!-- Vulkan GPU required -->
+    <uses-feature android:name="android.hardware.vulkan.level" android:version="1" android:required="true" />
+    <uses-feature android:name="android.hardware.vulkan.version" android:version="0x00401000" android:required="true" />
+
+    <!-- OpenGL ES fallback not used -->
+    <uses-feature android:glEsVersion="0x00030002" android:required="false" />
+
+    <application
+        android:label="Real Recompile"
+        android:hasCode="false"
+        android:allowBackup="false">
+
+        <activity
+            android:name="android.app.NativeActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:screenOrientation="landscape"
+            android:exported="true">
+
+            <meta-data
+                android:name="android.app.lib_name"
+                android:value="realrecompile" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

@@ -16,6 +16,8 @@ else()
     # Auto-detect bundled SDK
     if(WIN32)
         set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/win-amd64")
+    elseif(ANDROID)
+        set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/android-arm64")
     else()
         set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64")
     endif()
@@ -28,14 +30,17 @@ endif()
 find_package(rexglue REQUIRED)
 
 # ---------- User source files ----------
-set(APP_SOURCES
-    src/app/main.cpp
-)
+set(APP_SOURCES)
 
 # Platform-specific GUI entry point (from SDK share dir)
-if(WIN32)
+if(ANDROID)
+    # Android uses NativeActivity, not the windowed app framework
+    list(APPEND APP_SOURCES src/app/main_android.cpp)
+elseif(WIN32)
+    list(APPEND APP_SOURCES src/app/main.cpp)
     list(APPEND APP_SOURCES ${REXGLUE_SHARE_DIR}/windowed_app_main_win.cpp)
 else()
+    list(APPEND APP_SOURCES src/app/main.cpp)
     list(APPEND APP_SOURCES ${REXGLUE_SHARE_DIR}/windowed_app_main_posix.cpp)
 endif()
 
@@ -49,7 +54,10 @@ else()
 endif()
 
 # ---------- Executable ----------
-if(WIN32)
+if(ANDROID)
+    # Build as shared library for NativeActivity
+    add_library(realrecompile SHARED ${APP_SOURCES})
+elseif(WIN32)
     add_executable(realrecompile WIN32 ${APP_SOURCES})
 else()
     add_executable(realrecompile ${APP_SOURCES})
@@ -71,7 +79,24 @@ target_link_libraries(realrecompile PRIVATE
 )
 
 # ---------- Platform-specific settings ----------
-if(UNIX AND NOT APPLE)
+if(ANDROID)
+    # Android ARM64 - Vulkan, no GTK
+    find_library(LOG_LIB log)
+    find_library(ANDROID_LIB android)
+    find_library(VULKAN_LIB vulkan)
+    target_link_libraries(realrecompile PRIVATE
+        ${LOG_LIB} ${ANDROID_LIB} ${VULKAN_LIB})
+
+    # Whole-archive for kernel hooks
+    target_link_options(realrecompile PRIVATE
+        -Wl,--whole-archive
+        $<TARGET_FILE:rex::kernel>
+        -Wl,--no-whole-archive
+    )
+    # Allow unresolved Xbox kernel symbols
+    target_link_options(realrecompile PRIVATE -Wl,--unresolved-symbols=ignore-in-object-files)
+
+elseif(UNIX AND NOT APPLE)
     # GTK3 for entry point (windowed_app_main_posix.cpp)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
@@ -92,7 +117,7 @@ if(UNIX AND NOT APPLE)
     target_link_options(realrecompile PRIVATE -Wl,--unresolved-symbols=ignore-in-object-files)
 endif()
 
-if(NOT MSVC)
+if(NOT MSVC AND NOT ANDROID)
     target_compile_options(realrecompile PRIVATE -msse4.1)
 endif()
 
