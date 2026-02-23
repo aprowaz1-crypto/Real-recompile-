@@ -120,3 +120,53 @@ jobs:
         with:
           name: generated-sources
           path: generated/
+
+  build-windows:
+    name: Build Windows (Clang + D3D12)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install LLVM/Clang
+        run: choco install llvm ninja -y --no-progress
+
+      - name: Cache rexglue-sdk (Windows)
+        id: cache-sdk-win
+        uses: actions/cache@v4
+        with:
+          path: third_party/rexglue-sdk/win-amd64
+          key: rexglue-sdk-win-${{ env.REXGLUE_SDK_VERSION }}
+
+      - name: Download rexglue-sdk
+        if: steps.cache-sdk-win.outputs.cache-hit != 'true'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path third_party/rexglue-sdk | Out-Null
+          Invoke-WebRequest -Uri "$env:SDK_URL_WIN" -OutFile sdk.zip
+          Expand-Archive -Path sdk.zip -DestinationPath third_party/rexglue-sdk -Force
+          Remove-Item sdk.zip
+
+      - name: Configure
+        shell: cmd
+        run: |
+          cmake -B build -G Ninja ^
+            -DCMAKE_C_COMPILER=clang ^
+            -DCMAKE_CXX_COMPILER=clang++ ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DCMAKE_LINKER=lld-link
+
+      - name: Build
+        run: cmake --build build -j $env:NUMBER_OF_PROCESSORS
+
+      - name: Verify executable
+        shell: pwsh
+        run: |
+          Get-Item build/realrecompile.exe | Select-Object Name, Length
+          Write-Host "Build successful!"
+
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: realrecompile-win-amd64
+          path: build/realrecompile.exe

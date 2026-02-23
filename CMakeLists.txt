@@ -101,6 +101,24 @@ if(MSVC)
     target_compile_options(realrecompile PRIVATE /EHa)
 endif()
 
+# Windows-specific linking
+if(WIN32)
+    # System libraries needed by the SDK
+    target_link_libraries(realrecompile PRIVATE
+        d3d12 dxgi dxguid d3dcompiler
+        ws2_32 winmm ole32 oleaut32 uuid
+        shell32 advapi32 user32 gdi32 imm32
+        setupapi version shlwapi
+    )
+    # Whole-archive for kernel hooks (MSVC)
+    if(MSVC)
+        target_link_options(realrecompile PRIVATE
+            /WHOLEARCHIVE:$<TARGET_FILE:rex::kernel>
+            /FORCE:UNRESOLVED
+        )
+    endif()
+endif()
+
 # ---------- Codegen convenience target ----------
 # Run: cmake --build build --target codegen
 add_custom_target(codegen
