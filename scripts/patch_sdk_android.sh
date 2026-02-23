@@ -110,6 +110,20 @@ namespace rex { namespace ui { /* Android stubs - surfaces managed by app */ } }
 CPPEOF
 echo "  5. Created surface_android_stub.cpp"
 
+# ---- 4. Patch thirdparty/CMakeLists.txt: exclude x86 FFmpeg on Android ----
+python3 << PYEOF
+f = "${SDK_DIR}/thirdparty/CMakeLists.txt"
+text = open(f).read()
+
+# Fix FFmpeg x86 optimizations guard - exclude Android
+text = text.replace(
+    '# Add x86 optimizations on Windows/Linux\nif(WIN32 OR (UNIX AND NOT APPLE))',
+    '# Add x86 optimizations on Windows/Linux (not Android ARM64)\nif((WIN32 OR (UNIX AND NOT APPLE)) AND NOT ANDROID)')
+
+open(f, 'w').write(text)
+print("  6. Excluded FFmpeg x86 sources on Android")
+PYEOF
+
 # ---- 4. Patch kernel CMakeLists if it has x86 asm ----
 KERNEL_CMAKE="${SDK_DIR}/src/kernel/CMakeLists.txt"
 if [ -f "$KERNEL_CMAKE" ]; then
