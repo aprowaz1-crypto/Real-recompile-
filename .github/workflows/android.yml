@@ -17,7 +17,7 @@ jobs:
   build-android:
     name: Build Android ARM64 (Vulkan)
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    timeout-minutes: 180
 
     steps:
       - name: Checkout
@@ -85,10 +85,8 @@ jobs:
       - name: Build SDK for Android
         if: steps.cache-sdk-android.outputs.cache-hit != 'true'
         run: |
-          cmake --build /tmp/rexglue-sdk-build -j$(nproc) || {
-            echo "::warning::Full SDK build failed, attempting with reduced parallelism..."
-            cmake --build /tmp/rexglue-sdk-build -j2
-          }
+          echo "Building SDK with -j2 (1032 targets, ~40min)..."
+          cmake --build /tmp/rexglue-sdk-build -j2
 
       - name: Install SDK
         if: steps.cache-sdk-android.outputs.cache-hit != 'true'
@@ -124,7 +122,9 @@ jobs:
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build project
-        run: cmake --build build-android -j$(nproc)
+        run: |
+          echo "Building project with -j2 (17685 recompiled functions)..."
+          cmake --build build-android -j2
 
       - name: Verify shared library
         run: |
