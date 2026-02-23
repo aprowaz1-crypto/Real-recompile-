@@ -197,22 +197,15 @@ inline int GetAndroidApiLevel() {
 HEOF
 echo "  9. Created rex/main_android.h with GetAndroidApiLevel()"
 
-# 5e. Add #include <rex/main_android.h> to files that use GetAndroidApiLevel but don't include it
-python3 << PYEOF
-import glob, os
-for pattern in ['${SDK_DIR}/src/**/*.cpp', '${SDK_DIR}/src/**/*.h']:
-    for f in glob.glob(pattern, recursive=True):
-        text = open(f).read()
-        if 'GetAndroidApiLevel' in text and 'main_android.h' not in text:
-            # Insert after first #include
-            lines = text.split('\n')
-            for i, line in enumerate(lines):
-                if line.startswith('#include'):
-                    lines.insert(i+1, '#include <rex/main_android.h>')
-                    break
-            open(f, 'w').write('\n'.join(lines))
-            print(f"  9b. Added main_android.h to {os.path.basename(f)}")
-PYEOF
+# 5e. Directly patch memory_posix.cpp - replace commented-out xenia include with working one
+sed -i 's|// #include "xenia/base/main_android.h"|#include <rex/main_android.h>|' "${SDK_DIR}/src/core/memory_posix.cpp"
+echo "  9b. Patched memory_posix.cpp with rex/main_android.h include"
+
+# Also patch threading.cpp if needed (it already includes main_android.h via #if REX_PLATFORM_ANDROID)
+if grep -q 'GetAndroidApiLevel' "${SDK_DIR}/src/core/threading.cpp" && ! grep -q 'rex/main_android.h' "${SDK_DIR}/src/core/threading.cpp"; then
+    sed -i '/^#include <rex\/platform.h>/a #include <rex/main_android.h>' "${SDK_DIR}/src/core/threading.cpp"
+    echo "  9c. Patched threading.cpp with rex/main_android.h include"
+fi
 
 # 5d. Replace std::jthread / std::stop_token with std::thread + atomic<bool> in timer_queue.cpp
 python3 << PYEOF
