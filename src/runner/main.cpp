@@ -12,6 +12,7 @@ int main(int argc, char** argv) {
   bool save_after_changes = false;
   bool apply_preset_requested = false;
   runner::QualityPreset requested_preset = runner::QualityPreset::Medium;
+  const bool launched_without_args = (argc <= 1);
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
@@ -46,6 +47,10 @@ int main(int argc, char** argv) {
   }
 
   runner::Settings settings = runner::load_settings(config_path);
+
+  if (launched_without_args) {
+    interactive = true;
+  }
 
   if (reset_defaults) {
     runner::reset_to_defaults(settings);

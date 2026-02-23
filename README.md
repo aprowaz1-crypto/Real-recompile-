@@ -163,6 +163,9 @@ Runner settings commands:
 ./build/generated-linux/recompiled_runner --config config/settings.ini --apply-preset medium
 ```
 
+Note:
+- запуск `recompiled_runner` без аргументів відкриває консольне меню налаштувань і зберігає конфіг автоматично.
+
 Notes:
 - generated source dir default is `artifacts/generated`
 - override it with `GENERATED_DIR=/your/generated/path`
