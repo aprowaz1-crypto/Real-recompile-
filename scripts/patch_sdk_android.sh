@@ -124,6 +124,12 @@ open(f, 'w').write(text)
 print("  6. Excluded FFmpeg x86 sources on Android")
 PYEOF
 
+# ---- 4b. Fix SDL2 haptic on Android ----
+# SDL2's SDL_android.c calls Android_AddHaptic/RemoveHaptic even when SDL_HAPTIC=OFF
+# Solution: enable SDL_HAPTIC on Android so declarations are available
+sed -i 's|set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)|set(SDL_HAPTIC OFF CACHE BOOL "" FORCE)\nif(ANDROID)\n  set(SDL_HAPTIC ON CACHE BOOL "" FORCE)\nendif()|' "${SDK_DIR}/thirdparty/CMakeLists.txt"
+echo "  6b. Enabled SDL_HAPTIC on Android to fix implicit declarations"
+
 # ---- 4. Patch kernel CMakeLists if it has x86 asm ----
 KERNEL_CMAKE="${SDK_DIR}/src/kernel/CMakeLists.txt"
 if [ -f "$KERNEL_CMAKE" ]; then
