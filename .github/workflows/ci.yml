@@ -58,61 +58,80 @@ jobs:
   xenon-pipeline:
     name: Xenon Pipeline (Generate C++)
     runs-on: ubuntu-24.04
-    if: ${{ hashFiles('default.xex') != '' }}
     env:
-      XEX_PATH: /home/runner/work/Real-recompile-/Real-recompile-/default.xex
+      XEX_PATH: default.xex
       XENON_REPO_URL: https://github.com/hedge-dev/XenonRecomp.git
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check XEX presence
+        id: check_xex
+        run: |
+          if [ -f "$XEX_PATH" ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "[info] default.xex is missing, skipping xenon-pipeline steps"
+          fi
+
       - name: Validate scripts
+        if: steps.check_xex.outputs.exists == 'true'
         run: |
           chmod +x scripts/*.sh
           bash -n scripts/*.sh
 
       - name: Setup dependencies
+        if: steps.check_xex.outputs.exists == 'true'
         run: ./scripts/setup_codespace.sh
 
       - name: Build Xenon tools
+        if: steps.check_xex.outputs.exists == 'true'
         run: ./scripts/build_xenon_tools.sh
 
       - name: Analyse XEX
+        if: steps.check_xex.outputs.exists == 'true'
         run: ./scripts/analyse_xex.sh "$XEX_PATH"
 
       - name: Recompile XEX
+        if: steps.check_xex.outputs.exists == 'true'
         run: ./scripts/recompile_xex.sh "$XEX_PATH"
 
       - name: Find unimplemented
+        if: steps.check_xex.outputs.exists == 'true'
         run: ./scripts/find_unimplemented.sh
 
       - name: Build generated target
         id: build_generated
+        if: steps.check_xex.outputs.exists == 'true'
         continue-on-error: true
         run: ./scripts/build_generated_native.sh
 
       - name: Auto-fix generated labels
-        if: steps.build_generated.outcome == 'failure'
+        if: steps.check_xex.outputs.exists == 'true' && steps.build_generated.outcome == 'failure'
         run: ./scripts/fix_generated_labels.sh
 
       - name: Retry generated build
-        if: steps.build_generated.outcome == 'failure'
+        if: steps.check_xex.outputs.exists == 'true' && steps.build_generated.outcome == 'failure'
         continue-on-error: true
         run: ./scripts/build_generated_native.sh
 
       - name: Upload analysis artifacts
+        if: steps.check_xex.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: analysis-artifacts
           path: artifacts/analysis
 
       - name: Upload generated sources
+        if: steps.check_xex.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: generated-sources
           path: artifacts/generated
 
       - name: Upload reports
+        if: steps.check_xex.outputs.exists == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: reports
