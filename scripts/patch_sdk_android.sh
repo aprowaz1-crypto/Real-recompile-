@@ -302,21 +302,16 @@ PYEOF
 
 echo "C++23 compatibility patches applied!"
 
-# ---- 6. Fix std::chrono::clock_cast in threading.cpp (not in NDK libc++) ----
-python3 << PYEOF
-f = "${SDK_DIR}/src/core/threading.cpp"
-text = open(f).read()
-
-# Replace std::chrono::clock_cast<GClock_>(due_time) with manual conversion
-# clock_cast converts between WinSystemClock and XSystemClock (guest clock)
-# We use clock_time_conversion directly since clock_cast may not exist
-text = text.replace(
-    'std::chrono::clock_cast<GClock_>(due_time)',
-    'std::chrono::clock_time_conversion<GClock_, WClock_>{}(due_time)')
-
-open(f, 'w').write(text)
-print("  11. Replaced std::chrono::clock_cast with clock_time_conversion in threading.cpp")
-PYEOF
+# ---- 6. Fix std::chrono::clock_cast globally (not in NDK libc++) ----
+# Replace clock_cast<DestClock>( with clock_time_conversion<DestClock, SrcClock>{}(
+# Only replace the function-name part, leave arguments (which may span multiple lines) untouched
+find "${SDK_DIR}/src" -name '*.cpp' -o -name '*.h' | xargs grep -l 'clock_cast' 2>/dev/null | while read f; do
+    # clock_cast<WinSystemClock>( → clock_time_conversion<WinSystemClock, XSystemClock>{(
+    sed -i 's/std::chrono::clock_cast<WinSystemClock>(/std::chrono::clock_time_conversion<WinSystemClock, XSystemClock>{}(/g' "$f"
+    # clock_cast<GClock_>( → clock_time_conversion<GClock_, WClock_>{(
+    sed -i 's/std::chrono::clock_cast<GClock_>(/std::chrono::clock_time_conversion<GClock_, WClock_>{}(/g' "$f"
+    echo "  11. Replaced clock_cast in $(basename $f)"
+done
 
 # ---- 7. Fix NEON shift-by-variable in memory.h ----
 # On ARM64, vshlq_n / vshrq_n require compile-time constant shift amounts.
