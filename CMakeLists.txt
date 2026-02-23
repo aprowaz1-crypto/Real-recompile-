@@ -97,7 +97,11 @@ if(BUILD_RECOMPILED_TARGET)
   add_custom_target(recompiled_all DEPENDS recompiled_game)
 
   if(RECOMPILED_ENABLE_RUNNER)
-    add_executable(recompiled_runner src/runner/main.cpp)
+    add_executable(recompiled_runner
+      src/runner/main.cpp
+      src/runner/settings.cpp
+    )
+    target_include_directories(recompiled_runner PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/runner)
     target_link_libraries(recompiled_runner PRIVATE recompiled_game)
 
     if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
