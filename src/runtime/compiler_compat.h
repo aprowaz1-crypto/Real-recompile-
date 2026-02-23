@@ -22,3 +22,7 @@
 #if !defined(_MSC_VER) && !defined(__rdtsc)
 #define __rdtsc() __builtin_ia32_rdtsc()
 #endif
+
+#if !__has_builtin(__builtin_debugtrap)
+#define __builtin_debugtrap() __builtin_trap()
+#endif

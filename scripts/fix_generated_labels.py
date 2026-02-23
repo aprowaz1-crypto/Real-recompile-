@@ -4,7 +4,9 @@ import re
 import sys
 
 
-FUNC_START = re.compile(r"^\s*void\s+__imp__[^\(]*\([^\)]*\)\s*\{")
+FUNC_START = re.compile(
+    r"^\s*(?:void\s+__imp__[^\(]*\([^\)]*\)|PPC_FUNC_IMPL\(__imp__[^\)]*\))\s*\{"
+)
 GOTO_LABEL = re.compile(r"\bgoto\s+(loc_[0-9A-Fa-f]+)\s*;")
 DEF_LABEL = re.compile(r"^\s*(loc_[0-9A-Fa-f]+)\s*:\s*$")
 
