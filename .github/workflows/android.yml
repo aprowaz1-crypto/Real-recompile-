@@ -113,6 +113,23 @@ jobs:
           echo "SDK installed to: ${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
           ls -la "${{ github.workspace }}/third_party/rexglue-sdk/android-arm64/lib/" | head -20
 
+          # SDL2 headers: SDL2_DISABLE_INSTALL=ON prevents header install, but
+          # rex::input has ${SDK}/include/SDL2 in INTERFACE_INCLUDE_DIRECTORIES.
+          # Copy headers manually from the build tree.
+          SDK_DIR="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
+          mkdir -p "$SDK_DIR/include/SDL2"
+          if [ -d "/tmp/rexglue-sdk-src/third_party/SDL2/include" ]; then
+            cp -v /tmp/rexglue-sdk-src/third_party/SDL2/include/*.h "$SDK_DIR/include/SDL2/" 2>/dev/null || true
+            echo "Copied $(ls "$SDK_DIR/include/SDL2/" | wc -l) SDL2 headers"
+          elif [ -d "/tmp/rexglue-sdk-src/third_party/SDL/include" ]; then
+            cp -rv /tmp/rexglue-sdk-src/third_party/SDL/include/SDL3/*.h "$SDK_DIR/include/SDL2/" 2>/dev/null || true
+            echo "Copied SDL headers from SDL/include"
+          fi
+          # Also check generated SDL_config.h from build tree
+          find /tmp/rexglue-sdk-build -name "SDL_config.h" -exec cp -v {} "$SDK_DIR/include/SDL2/" \; 2>/dev/null || true
+          ls "$SDK_DIR/include/SDL2/" | head -20
+          echo "Total SDL2 headers: $(ls "$SDK_DIR/include/SDL2/" | wc -l)"
+
           # Patch rexglueConfig.cmake: only remove find_dependency(SDL2) since
           # SDL2_DISABLE_INSTALL=ON means no SDL2Config.cmake was installed.
           # All other deps (fmt, spdlog, Snappy, etc.) have their cmake configs installed.

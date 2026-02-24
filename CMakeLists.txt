@@ -155,11 +155,13 @@ if(WIN32)
 endif()
 
 # ---------- Codegen convenience target ----------
-# Run: cmake --build build --target codegen
-add_custom_target(codegen
-    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64/bin/rexglue
-            codegen ${CMAKE_CURRENT_SOURCE_DIR}/realrecompile_config.toml
-    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-    COMMENT "Generating recompiled C++ code from XEX"
-    VERBATIM
-)
+# Run: cmake --build build --target run-codegen
+if(NOT ANDROID)
+    add_custom_target(run-codegen
+        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64/bin/rexglue
+                codegen ${CMAKE_CURRENT_SOURCE_DIR}/realrecompile_config.toml
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        COMMENT "Generating recompiled C++ code from XEX"
+        VERBATIM
+    )
+endif()
