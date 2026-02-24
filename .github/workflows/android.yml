@@ -156,7 +156,7 @@ jobs:
           file build-android/librealrecompile.so | grep -q "aarch64" && echo "✓ ARM64 verified"
 
       # ============================================
-      # Step 3: Package APK
+      # Step 3: Package APK with Launcher UI
       # ============================================
       - name: Build APK
         run: |
@@ -172,30 +172,55 @@ jobs:
             cp default.xex apk-staging/assets/
           fi
 
-          # Compile manifest
-          $BUILD_TOOLS/aapt2 compile --dir android/res -o apk-staging/compiled_res.zip 2>/dev/null || true
+          # ---- Compile resources ----
+          echo "Compiling Android resources..."
+          mkdir -p apk-staging/compiled_res
+          $BUILD_TOOLS/aapt2 compile --dir android/res -o apk-staging/compiled_res/
 
-          # Link into APK
+          # ---- Link resources + manifest into base APK ----
+          echo "Linking APK..."
           $BUILD_TOOLS/aapt2 link \
-            -o apk-staging/realrecompile-unaligned.apk \
+            -o apk-staging/realrecompile-base.apk \
             --manifest android/AndroidManifest.xml \
             -I "$PLATFORM_JAR" \
             --min-sdk-version ${{ env.ANDROID_API }} \
-            --target-sdk-version 34 || {
-            # Fallback: manual APK creation
-            echo "aapt2 link failed, using manual APK assembly..."
-            cd apk-staging
-            cp ../android/AndroidManifest.xml .
-            zip -r realrecompile-unaligned.apk lib/ assets/ AndroidManifest.xml
-            cd ..
-          }
+            --target-sdk-version 34 \
+            --auto-add-overlay \
+            -R apk-staging/compiled_res/*.flat \
+            --java apk-staging/gen
 
-          # Add native libs to APK
-          cd apk-staging
-          if [ -f realrecompile-unaligned.apk ]; then
-            zip -u realrecompile-unaligned.apk lib/arm64-v8a/librealrecompile.so
-            [ -f assets/default.xex ] && zip -u realrecompile-unaligned.apk assets/default.xex
+          # ---- Compile Java (LauncherActivity) ----
+          echo "Compiling Java launcher..."
+          mkdir -p apk-staging/classes
+          find android/java -name "*.java" > apk-staging/java_sources.txt
+
+          # Also compile generated R.java
+          if [ -d "apk-staging/gen" ]; then
+            find apk-staging/gen -name "*.java" >> apk-staging/java_sources.txt
           fi
+
+          javac -source 11 -target 11 \
+            -bootclasspath "$PLATFORM_JAR" \
+            -classpath "$PLATFORM_JAR" \
+            -d apk-staging/classes \
+            @apk-staging/java_sources.txt
+
+          # ---- Convert to DEX ----
+          echo "Creating DEX..."
+          $BUILD_TOOLS/d8 \
+            --min-api ${{ env.ANDROID_API }} \
+            --output apk-staging/ \
+            apk-staging/classes/com/realrecompile/app/*.class
+
+          # ---- Build final APK ----
+          echo "Assembling final APK..."
+          cp apk-staging/realrecompile-base.apk apk-staging/realrecompile-unaligned.apk
+
+          # Add DEX + native libs + assets
+          cd apk-staging
+          zip -u realrecompile-unaligned.apk classes.dex
+          zip -u realrecompile-unaligned.apk lib/arm64-v8a/librealrecompile.so
+          [ -f assets/default.xex ] && zip -u realrecompile-unaligned.apk assets/default.xex
           cd ..
 
           # Align

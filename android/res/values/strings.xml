@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Real Steel Recompiled</string>
+    <string name="title_real_steel">REAL STEEL</string>
+    <string name="subtitle_recompiled">R E C O M P I L E D</string>
+    <string name="label_game_files">GAME FILES</string>
+    <string name="btn_add_xex">SELECT DEFAULT.XEX</string>
+    <string name="btn_add_dlc">ADD DLC (OPTIONAL)</string>
+    <string name="btn_play">FIGHT!</string>
+    <string name="status_no_xex">⚠ Game file required to play</string>
+    <string name="status_xex_found">✓ default.xex loaded</string>
+    <string name="status_dlc_found">✓ DLC content loaded</string>
+    <string name="hint_xex">Add your Real Steel Xbox 360 default.xex file to start the recompiled game. DLC packs are optional.</string>
+    <string name="loading">INITIALIZING ARENA…</string>
+    <string name="version_info">Xbox 360 → Android ARM64 | Vulkan</string>
+</resources>

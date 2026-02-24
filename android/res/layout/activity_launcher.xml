@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/bg_gradient">
+
+    <!-- Main content - centered card -->
+    <LinearLayout
+        android:layout_width="560dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <!-- Red accent line at top -->
+        <View
+            android:layout_width="120dp"
+            android:layout_height="3dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginBottom="16dp"
+            android:background="@drawable/accent_line" />
+
+        <!-- Title: REAL STEEL -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:text="@string/title_real_steel"
+            android:textColor="#FFFFFFFF"
+            android:textSize="42sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.15"
+            android:fontFamily="sans-serif-condensed"
+            android:shadowColor="#FFFF4444"
+            android:shadowDx="0"
+            android:shadowDy="0"
+            android:shadowRadius="12" />
+
+        <!-- Subtitle: RECOMPILED -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="2dp"
+            android:text="@string/subtitle_recompiled"
+            android:textColor="#BBFF4444"
+            android:textSize="14sp"
+            android:letterSpacing="0.5"
+            android:fontFamily="sans-serif-light" />
+
+        <!-- Red accent line below title -->
+        <View
+            android:layout_width="80dp"
+            android:layout_height="2dp"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="24dp"
+            android:background="@drawable/accent_line" />
+
+        <!-- File management card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:background="@drawable/card_bg"
+            android:padding="20dp">
+
+            <!-- Section label -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_game_files"
+                android:textColor="#88AABBCC"
+                android:textSize="11sp"
+                android:letterSpacing="0.3"
+                android:layout_marginBottom="12dp" />
+
+            <!-- XEX status -->
+            <TextView
+                android:id="@+id/tv_xex_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_no_xex"
+                android:textColor="#FFFF8844"
+                android:textSize="13sp"
+                android:layout_marginBottom="12dp"
+                android:fontFamily="sans-serif-medium" />
+
+            <!-- Buttons row -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <!-- Add XEX button -->
+                <TextView
+                    android:id="@+id/btn_add_xex"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/btn_add_xex"
+                    android:textColor="#FFFF4444"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:letterSpacing="0.05"
+                    android:background="@drawable/btn_accent"
+                    android:layout_marginEnd="8dp"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+                <!-- Add DLC button -->
+                <TextView
+                    android:id="@+id/btn_add_dlc"
+                    android:layout_width="0dp"
+                    android:layout_height="48dp"
+                    android:layout_weight="1"
+                    android:gravity="center"
+                    android:text="@string/btn_add_dlc"
+                    android:textColor="#88AABBCC"
+                    android:textSize="13sp"
+                    android:letterSpacing="0.05"
+                    android:background="@drawable/btn_secondary"
+                    android:layout_marginStart="8dp"
+                    android:clickable="true"
+                    android:focusable="true" />
+
+            </LinearLayout>
+
+            <!-- DLC status (hidden by default) -->
+            <TextView
+                android:id="@+id/tv_dlc_status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/status_dlc_found"
+                android:textColor="#FF44BB66"
+                android:textSize="12sp"
+                android:layout_marginTop="8dp"
+                android:visibility="gone" />
+
+            <!-- Hint text -->
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="@string/hint_xex"
+                android:textColor="#44FFFFFF"
+                android:textSize="11sp"
+                android:lineSpacingExtra="3dp" />
+
+        </LinearLayout>
+
+        <!-- FIGHT button -->
+        <TextView
+            android:id="@+id/btn_play"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="20dp"
+            android:gravity="center"
+            android:text="@string/btn_play"
+            android:textColor="#FFFFFFFF"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:letterSpacing="0.2"
+            android:fontFamily="sans-serif-condensed"
+            android:background="@drawable/btn_play_disabled"
+            android:clickable="true"
+            android:focusable="true"
+            android:enabled="false" />
+
+        <!-- Version info -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="16dp"
+            android:text="@string/version_info"
+            android:textColor="#33FFFFFF"
+            android:textSize="10sp"
+            android:letterSpacing="0.1" />
+
+    </LinearLayout>
+
+</FrameLayout>

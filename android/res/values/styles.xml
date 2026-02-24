@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Real Steel dark metallic theme -->
+    <style name="RealSteelTheme" parent="android:Theme.DeviceDefault.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/bg_gradient</item>
+        <item name="android:colorPrimary">#FF1A1A2E</item>
+        <item name="android:colorPrimaryDark">#FF0F0F1A</item>
+        <item name="android:colorAccent">#FFFF4444</item>
+        <item name="android:statusBarColor">#00000000</item>
+        <item name="android:navigationBarColor">#00000000</item>
+        <item name="android:windowTranslucentStatus">true</item>
+        <item name="android:windowTranslucentNavigation">true</item>
+    </style>
+</resources>
