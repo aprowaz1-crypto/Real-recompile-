@@ -161,34 +161,32 @@ jobs:
             echo "=== end ==="
           fi
 
-          # Remove -lpthread, -lrt, -pthread from ALL cmake files recursively
-          # These libraries don't exist on Android (bionic has pthread built-in)
+          # Remove -lpthread and -lrt from cmake target files.
+          # These libraries don't exist on Android (bionic has pthread built-in).
+          # Do NOT remove -pthread (it's a compile flag, not a library).
+          # Use Python for reliable semicolon-delimited list manipulation.
           SDK_ROOT="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
-          echo "Removing -lpthread, -lrt, -pthread from ALL cmake files..."
-          find "$SDK_ROOT" -name "*.cmake" -type f | while read f; do
-            if grep -q -E 'lpthread|;rt;|"-lrt"|-lrt;|-pthread' "$f" 2>/dev/null; then
-              echo "  Patching: $f"
-              # Show before
-              grep -n 'pthread\|-lrt' "$f" | head -5
-              # Remove all forms: ;-lpthread; "-lpthread" -lpthread etc.
-              sed -i \
-                -e 's/;-lpthread//g' \
-                -e 's/-lpthread;//g' \
-                -e 's/"-lpthread"//g' \
-                -e 's/-lpthread//g' \
-                -e 's/;-lrt//g' \
-                -e 's/-lrt;//g' \
-                -e 's/"-lrt"//g' \
-                -e 's/-lrt//g' \
-                -e 's/;-pthread//g' \
-                -e 's/-pthread;//g' \
-                -e 's/"-pthread"//g' \
-                -e 's/-pthread//g' \
-                "$f"
-              echo "  After:"
-              grep -n 'pthread\|-lrt' "$f" | head -5 || echo "  (clean)"
-            fi
-          done
+          find "$SDK_ROOT" -name "*.cmake" -type f -print0 | xargs -0 python3 -c "
+import sys, re
+for path in sys.argv[1:]:
+    with open(path) as f:
+        orig = f.read()
+    # Remove ;-lpthread and ;-lrt from semicolon-separated lists
+    text = orig
+    # Handle INTERFACE_LINK_LIBRARIES entries like: ...;-lpthread;-lrt;...
+    text = re.sub(r';-lpthread\b', '', text)
+    text = re.sub(r';-lrt\b', '', text)
+    # Handle leading position: -lpthread;...
+    text = re.sub(r'\b-lpthread;', '', text)
+    text = re.sub(r'\b-lrt;', '', text)
+    # Handle quoted standalone
+    text = text.replace('\"-lpthread\"', '')
+    text = text.replace('\"-lrt\"', '')
+    if text != orig:
+        with open(path, 'w') as f:
+            f.write(text)
+        print(f'  Patched: {path}')
+"
           echo "Done patching cmake files"
 
       # ============================================
