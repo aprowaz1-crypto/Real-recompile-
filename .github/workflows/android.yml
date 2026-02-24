@@ -161,16 +161,33 @@ jobs:
             echo "=== end ==="
           fi
 
-          # Remove -lpthread, -lrt, -pthread from all cmake target files
+          # Remove -lpthread, -lrt, -pthread from ALL cmake files recursively
           # These libraries don't exist on Android (bionic has pthread built-in)
           SDK_ROOT="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
-          echo "Removing -lpthread, -lrt, -pthread from cmake target files..."
-          find "$SDK_ROOT" -name "*.cmake" -exec grep -l 'pthread\|;rt;' {} \; 2>/dev/null | while read f; do
-            echo "  Patching: $f"
-            # Remove ;-lpthread; ;-lrt; ;-pthread; from INTERFACE_LINK_LIBRARIES
-            sed -i 's/;-lpthread//g; s/;-lrt//g; s/;-pthread//g; s/-lpthread;//g; s/-lrt;//g; s/-pthread;//g' "$f"
-            # Also remove standalone -lpthread -lrt -pthread (no semicolons)
-            sed -i 's/ -lpthread//g; s/ -lrt//g; s/ -pthread//g' "$f"
+          echo "Removing -lpthread, -lrt, -pthread from ALL cmake files..."
+          find "$SDK_ROOT" -name "*.cmake" -type f | while read f; do
+            if grep -q -E 'lpthread|;rt;|"-lrt"|-lrt;|-pthread' "$f" 2>/dev/null; then
+              echo "  Patching: $f"
+              # Show before
+              grep -n 'pthread\|-lrt' "$f" | head -5
+              # Remove all forms: ;-lpthread; "-lpthread" -lpthread etc.
+              sed -i \
+                -e 's/;-lpthread//g' \
+                -e 's/-lpthread;//g' \
+                -e 's/"-lpthread"//g' \
+                -e 's/-lpthread//g' \
+                -e 's/;-lrt//g' \
+                -e 's/-lrt;//g' \
+                -e 's/"-lrt"//g' \
+                -e 's/-lrt//g' \
+                -e 's/;-pthread//g' \
+                -e 's/-pthread;//g' \
+                -e 's/"-pthread"//g' \
+                -e 's/-pthread//g' \
+                "$f"
+              echo "  After:"
+              grep -n 'pthread\|-lrt' "$f" | head -5 || echo "  (clean)"
+            fi
           done
           echo "Done patching cmake files"
 
