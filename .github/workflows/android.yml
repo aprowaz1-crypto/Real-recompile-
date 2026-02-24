@@ -82,6 +82,8 @@ jobs:
             -DSDL_TEST=OFF \
             -DCMAKE_THREAD_LIBS_INIT="" \
             -DTHREADS_HAVE_PTHREAD_ARG=TRUE \
+            -DCMAKE_HAVE_THREADS_LIBRARY=1 \
+            -DTHREADS_PREFER_PTHREAD_FLAG=OFF \
             -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/third_party/rexglue-sdk/android-arm64
 
       - name: Build SDK for Android

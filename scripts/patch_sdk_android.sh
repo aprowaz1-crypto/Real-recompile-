@@ -362,6 +362,28 @@ echo "  13. Added 'using namespace arch' for ARM64 in mmio_handler.cpp"
 # ---- 9. Fix Android linker: no -lpthread, no -lrt (bionic includes them) ----
 echo "Fixing Android linker flags (-lpthread, -lrt)..."
 
+# 9a. Patch root CMakeLists.txt to set Threads variables for Android bionic
+# This ensures find_package(Threads) creates Threads::Threads without -lpthread
+python3 << PYEOF
+f = "${SDK_DIR}/CMakeLists.txt"
+text = open(f).read()
+# Insert Android thread setup right after the project() command
+thread_setup = '''
+# Android bionic includes pthreads - no separate library needed
+if(ANDROID)
+  set(CMAKE_THREAD_LIBS_INIT "" CACHE STRING "" FORCE)
+  set(CMAKE_HAVE_THREADS_LIBRARY 1 CACHE BOOL "" FORCE)
+  set(CMAKE_USE_PTHREADS_INIT 1 CACHE BOOL "" FORCE)
+  set(THREADS_PREFER_PTHREAD_FLAG OFF CACHE BOOL "" FORCE)
+endif()
+'''
+# Insert after first project() call
+import re
+text = re.sub(r'(project\([^)]+\))', r'\1' + thread_setup, text, count=1)
+open(f, 'w').write(text)
+print("  13b. Added Android Threads setup in root CMakeLists.txt")
+PYEOF
+
 # Remove -lrt and -lpthread from CMake files (bionic includes them)
 # Use Python for safer, targeted replacement
 python3 << PYEOF
@@ -376,11 +398,6 @@ for root, dirs, files in os.walk("${SDK_DIR}"):
             text = text.replace('-lpthread', '')
             text = text.replace('-lrt', '')
             text = text.replace('-pthread', '')  # also the gcc-style flag
-            # On Android, Threads::Threads is handled by bionic - remove find_package(Threads)
-            if 'ANDROID' not in path:  # don't modify android-specific cmake files
-                text = re.sub(r'find_package\(Threads\s+(REQUIRED\s*)?\\)', '', text)
-                text = re.sub(r'find_package\(Threads\s+REQUIRED\)', '', text)
-                text = re.sub(r'find_package\(Threads\)', '', text)
             # Remove "pthread" and "rt" as standalone cmake arguments (quoted)
             text = re.sub(r'"\s*pthread\s*"', '', text)
             text = re.sub(r'"\s*rt\s*"', '', text)
