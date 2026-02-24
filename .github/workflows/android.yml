@@ -113,20 +113,16 @@ jobs:
           echo "SDK installed to: ${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
           ls -la "${{ github.workspace }}/third_party/rexglue-sdk/android-arm64/lib/" | head -20
 
-          # Patch rexglueConfig.cmake: remove find_dependency(SDL2) since SDL2-static
-          # is already in the rexglue export set and SDL2Config.cmake wasn't installed
+          # Patch rexglueConfig.cmake: only remove find_dependency(SDL2) since
+          # SDL2_DISABLE_INSTALL=ON means no SDL2Config.cmake was installed.
+          # All other deps (fmt, spdlog, Snappy, etc.) have their cmake configs installed.
           SDK_CMAKE="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64/lib/cmake/rexglue"
           if [ -f "$SDK_CMAKE/rexglueConfig.cmake" ]; then
             sed -i '/find_dependency(SDL2/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(spdlog/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(fmt/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(Snappy/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(utf8cpp/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(VulkanHeaders/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(volk/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            sed -i '/find_dependency(VulkanMemoryAllocator/d' "$SDK_CMAKE/rexglueConfig.cmake"
-            echo "Patched rexglueConfig.cmake: removed ALL find_dependency calls"
+            echo "Patched rexglueConfig.cmake: removed find_dependency(SDL2)"
+            echo "=== rexglueConfig.cmake contents ==="
             cat "$SDK_CMAKE/rexglueConfig.cmake"
+            echo "=== end ==="
           fi
 
       # ============================================
@@ -141,6 +137,7 @@ jobs:
             -DANDROID_STL=c++_static \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_PREFIX_PATH="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64" \
+            -DCMAKE_FIND_ROOT_PATH="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64" \
             -DCMAKE_FIND_ROOT_PATH_MODE_PACKAGE=BOTH
 
       - name: Build project
