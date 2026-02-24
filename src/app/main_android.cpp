@@ -1,5 +1,5 @@
 // realrecompile - Android Native Activity entry point
-// Adapted from windowed_app_main_posix.cpp for Android NativeActivity
+// Simplified version of main.cpp for Android NativeActivity
 
 #include "generated/realrecompile_config.h"
 #include "generated/realrecompile_init.h"
@@ -10,16 +10,6 @@
 #include <rex/logging.h>
 #include <rex/kernel/xthread.h>
 #include <rex/kernel/kernel_state.h>
-#include <rex/graphics/graphics_system.h>
-#include <rex/ui/window.h>
-#include <rex/ui/window_listener.h>
-#include <rex/ui/windowed_app.h>
-#include <rex/ui/graphics_provider.h>
-#include <rex/ui/immediate_drawer.h>
-#include <rex/ui/imgui_drawer.h>
-#include <rex/ui/imgui_dialog.h>
-
-#include <imgui.h>
 
 #include <android/native_activity.h>
 #include <android/log.h>
@@ -123,8 +113,9 @@ void ANativeActivity_onCreate(ANativeActivity* activity,
 
     LOGI("NativeActivity onCreate");
 
-    // Initialize logging to logcat
-    rex::InitLogging(nullptr);
+    // Initialize logging
+    auto log_config = rex::BuildLogConfig(nullptr, "info", {});
+    rex::InitLogging(log_config);
 
     // Set up callbacks
     activity->callbacks->onNativeWindowCreated = onNativeWindowCreated;
