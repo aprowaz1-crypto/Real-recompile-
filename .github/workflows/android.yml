@@ -115,20 +115,35 @@ jobs:
 
           # SDL2 headers: SDL2_DISABLE_INSTALL=ON prevents header install, but
           # rex::input has ${SDK}/include/SDL2 in INTERFACE_INCLUDE_DIRECTORIES.
-          # Copy headers manually from the build tree.
+          # Copy headers manually from the SDK source tree.
           SDK_DIR="${{ github.workspace }}/third_party/rexglue-sdk/android-arm64"
           mkdir -p "$SDK_DIR/include/SDL2"
-          if [ -d "/tmp/rexglue-sdk-src/third_party/SDL2/include" ]; then
-            cp -v /tmp/rexglue-sdk-src/third_party/SDL2/include/*.h "$SDK_DIR/include/SDL2/" 2>/dev/null || true
-            echo "Copied $(ls "$SDK_DIR/include/SDL2/" | wc -l) SDL2 headers"
-          elif [ -d "/tmp/rexglue-sdk-src/third_party/SDL/include" ]; then
-            cp -rv /tmp/rexglue-sdk-src/third_party/SDL/include/SDL3/*.h "$SDK_DIR/include/SDL2/" 2>/dev/null || true
-            echo "Copied SDL headers from SDL/include"
-          fi
-          # Also check generated SDL_config.h from build tree
+          # Try all possible SDL2 source locations in the SDK tree
+          for sdl_dir in \
+            /tmp/rexglue-sdk-src/thirdparty/sdl2/include \
+            /tmp/rexglue-sdk-src/thirdparty/SDL2/include \
+            /tmp/rexglue-sdk-src/third_party/sdl2/include \
+            /tmp/rexglue-sdk-src/third_party/SDL2/include \
+            /tmp/rexglue-sdk-src/third_party/SDL/include; do
+            if [ -d "$sdl_dir" ]; then
+              echo "Found SDL2 headers at: $sdl_dir"
+              cp -v "$sdl_dir"/*.h "$SDK_DIR/include/SDL2/" 2>/dev/null || true
+              break
+            fi
+          done
+          # Also copy generated SDL_config.h from build tree
           find /tmp/rexglue-sdk-build -name "SDL_config.h" -exec cp -v {} "$SDK_DIR/include/SDL2/" \; 2>/dev/null || true
-          ls "$SDK_DIR/include/SDL2/" | head -20
-          echo "Total SDL2 headers: $(ls "$SDK_DIR/include/SDL2/" | wc -l)"
+          # If no headers found, search more broadly
+          if [ "$(ls "$SDK_DIR/include/SDL2/" 2>/dev/null | wc -l)" -eq 0 ]; then
+            echo "No SDL2 headers found in known paths, searching..."
+            SDL_H=$(find /tmp/rexglue-sdk-src -name "SDL.h" -path "*/include/*" 2>/dev/null | head -1)
+            if [ -n "$SDL_H" ]; then
+              SDL_INC_DIR=$(dirname "$SDL_H")
+              echo "Found SDL.h at: $SDL_INC_DIR"
+              cp -v "$SDL_INC_DIR"/*.h "$SDK_DIR/include/SDL2/" 2>/dev/null || true
+            fi
+          fi
+          echo "Total SDL2 headers: $(ls "$SDK_DIR/include/SDL2/" 2>/dev/null | wc -l)"
 
           # Patch rexglueConfig.cmake: only remove find_dependency(SDL2) since
           # SDL2_DISABLE_INSTALL=ON means no SDL2Config.cmake was installed.
