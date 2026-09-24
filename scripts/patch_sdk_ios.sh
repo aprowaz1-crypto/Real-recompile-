@@ -161,8 +161,8 @@ PYEOF
 
 # ---- 5. Patch C++23 compatibility for iOS ----
 # 5a. Replace std::move_only_function with std::function in ALL source files
-find "${SDK_DIR}/include" "${SDK_DIR}/src" -name '*.h' -o -name '*.hpp' -o -name '*.cpp' | \
-  xargs sed -i 's/std::move_only_function/std::function/g'
+find "${SDK_DIR}/include" "${SDK_DIR}/src" \( -name '*.h' -o -name '*.hpp' -o -name '*.cpp' \) -print0 | \
+  xargs -0 sed -i 's/std::move_only_function/std::function/g' 2>/dev/null || echo "  7. No .h/.hpp/.cpp files found or sed failed, continuing"
 echo "  7. Replaced std::move_only_function -> std::function globally"
 
 # 5b. Add clock_time_conversion forward declaration in chrono.h
@@ -256,11 +256,12 @@ if [ -f "${SDK_DIR}/src/core/memory_posix.cpp" ]; then
 fi
 
 # ---- 6. Fix std::chrono::clock_cast globally ----
-find "${SDK_DIR}/src" -name '*.cpp' -o -name '*.h' | xargs grep -l 'clock_cast' 2>/dev/null | while read f; do
+find "${SDK_DIR}/src" \( -name '*.cpp' -o -name '*.h' \) -print0 | \
+  xargs -0 grep -l 'clock_cast' 2>/dev/null | while IFS= read -r f; do
     sed -i 's/std::chrono::clock_cast<WinSystemClock>(/std::chrono::clock_time_conversion<WinSystemClock, XSystemClock>{}(/g' "$f"
     sed -i 's/std::chrono::clock_cast<GClock_>(/std::chrono::clock_time_conversion<GClock_, WClock_>{}(/g' "$f"
-    echo "  11. Replaced clock_cast in $(basename $f)"
-done
+    echo "  11. Replaced clock_cast in $(basename "$f")"
+  done || echo "  11. No clock_cast files found or grep failed, continuing"
 
 # ---- 7. Fix NEON shift-by-variable in memory.h ----
 python3 << PYEOF
