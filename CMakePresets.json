@@ -33,6 +33,21 @@
             }
         },
         {
+            "name": "macos-base",
+            "hidden": true,
+            "generator": "Xcode",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_OSX_ARCHITECTURES": "arm64",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "14.0"
+            },
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
             "name": "win-amd64-debug",
             "displayName": "Windows AMD64 Debug",
             "inherits": "windows-base",
@@ -67,6 +82,34 @@
             "displayName": "Linux AMD64 RelWithDebInfo",
             "inherits": "linux-base",
             "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" }
+        },
+        {
+            "name": "ios-arm64-debug",
+            "displayName": "iOS ARM64 Debug",
+            "inherits": "macos-base",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "iOS",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "14.0",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED": "NO",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED": "NO",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_IDENTITY": "",
+                "CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM": "",
+                "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "ios-arm64-release",
+            "displayName": "iOS ARM64 Release",
+            "inherits": "macos-base",
+            "cacheVariables": {
+                "CMAKE_SYSTEM_NAME": "iOS",
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "14.0",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED": "NO",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED": "NO",
+                "CMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_IDENTITY": "",
+                "CMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM": "",
+                "CMAKE_BUILD_TYPE": "Release"
+            }
         }
     ],
     "buildPresets": [
@@ -75,6 +118,8 @@
         { "name": "win-amd64-relwithdebinfo", "configurePreset": "win-amd64-relwithdebinfo" },
         { "name": "linux-amd64-debug", "configurePreset": "linux-amd64-debug" },
         { "name": "linux-amd64-release", "configurePreset": "linux-amd64-release" },
-        { "name": "linux-amd64-relwithdebinfo", "configurePreset": "linux-amd64-relwithdebinfo" }
+        { "name": "linux-amd64-relwithdebinfo", "configurePreset": "linux-amd64-relwithdebinfo" },
+        { "name": "ios-arm64-debug", "configurePreset": "ios-arm64-debug" },
+        { "name": "ios-arm64-release", "configurePreset": "ios-arm64-release" }
     ]
 }

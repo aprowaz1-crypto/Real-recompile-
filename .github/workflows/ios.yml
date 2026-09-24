@@ -1,0 +1,143 @@
+name: iOS Build
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  REXGLUE_SDK_VERSION: v0.1.2
+  IOS_DEPLOYMENT_TARGET: "14.0"
+
+jobs:
+  build-ios:
+    name: Build iOS ARM64 (Vulkan/MoltenVK)
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        run: |
+          sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Cache rexglue-sdk iOS
+        id: cache-sdk-ios
+        uses: actions/cache@v4
+        with:
+          path: third_party/rexglue-sdk/ios-arm64
+          key: rexglue-sdk-ios-arm64-${{ env.REXGLUE_SDK_VERSION }}-${{ hashFiles('scripts/patch_sdk_ios.sh') }}
+
+      # ============================================
+      # Step 1: Build rexglue-sdk from source for iOS ARM64
+      # ============================================
+      - name: Clone rexglue-sdk source
+        if: steps.cache-sdk-ios.outputs.cache-hit != 'true'
+        run: |
+          git clone --recursive --depth 1 --branch ${REXGLUE_SDK_VERSION} \
+            https://github.com/rexglue/rexglue-sdk.git /tmp/rexglue-sdk-src
+          cd /tmp/rexglue-sdk-src
+          git submodule update --init --recursive
+
+      - name: Patch SDK for iOS ARM64
+        if: steps.cache-sdk-ios.outputs.cache-hit != 'true'
+        run: |
+          chmod +x scripts/patch_sdk_ios.sh
+          bash scripts/patch_sdk_ios.sh /tmp/rexglue-sdk-src
+
+      - name: Configure SDK for iOS
+        if: steps.cache-sdk-ios.outputs.cache-hit != 'true'
+        run: |
+          cmake -B /tmp/rexglue-sdk-build -S /tmp/rexglue-sdk-src -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.IOS_DEPLOYMENT_TARGET }} \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_IDENTITY="" \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=${{ github.workspace }}/third_party/rexglue-sdk/ios-arm64
+
+      - name: Build SDK for iOS
+        if: steps.cache-sdk-ios.outputs.cache-hit != 'true'
+        run: |
+          echo "Building SDK for iOS ARM64..."
+          cmake --build /tmp/rexglue-sdk-build --config Release -j$(sysctl -n hw.ncpu)
+
+      - name: Install SDK for iOS
+        if: steps.cache-sdk-ios.outputs.cache-hit != 'true'
+        run: |
+          cmake --install /tmp/rexglue-sdk-build || {
+            echo "::warning::cmake install had errors, manually copying artifacts..."
+            SDK_DEST="${{ github.workspace }}/third_party/rexglue-sdk/ios-arm64"
+            mkdir -p "$SDK_DEST/lib" "$SDK_DEST/include" "$SDK_DEST/share"
+            find /tmp/rexglue-sdk-build -name '*.a' -exec cp {} "$SDK_DEST/lib/" \;
+            if [ -d "/tmp/rexglue-sdk-src/include" ]; then
+              cp -r /tmp/rexglue-sdk-src/include/* "$SDK_DEST/include/"
+            fi
+            if [ -d "/tmp/rexglue-sdk-src/share" ]; then
+              cp -r /tmp/rexglue-sdk-src/share/* "$SDK_DEST/share/"
+            fi
+          }
+          echo "SDK installed to: ${{ github.workspace }}/third_party/rexglue-sdk/ios-arm64"
+          ls -la "${{ github.workspace }}/third_party/rexglue-sdk/ios-arm64/lib/" | head -20
+
+      # ============================================
+      # Step 2: Codegen (generate C++ from XEX)
+      # ============================================
+      - name: Codegen (generate C++ from XEX)
+        run: |
+          chmod +x third_party/rexglue-sdk/macos-amd64/bin/rexglue || true
+          if [ -x third_party/rexglue-sdk/macos-amd64/bin/rexglue ]; then
+            if [ -f "default.xex" ]; then
+              third_party/rexglue-sdk/macos-amd64/bin/rexglue codegen realrecompile_config.toml
+            else
+              echo "[info] default.xex not found, using pre-generated code"
+            fi
+          else
+            echo "[warn] macOS rexglue binary not found, codegen will be skipped"
+          fi
+
+      # ============================================
+      # Step 3: Build the project against iOS SDK
+      # ============================================
+      - name: Configure project
+        run: |
+          cmake -B build-ios -G Xcode \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=${{ env.IOS_DEPLOYMENT_TARGET }} \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_IDENTITY="" \
+            -DCMAKE_PREFIX_PATH="${{ github.workspace }}/third_party/rexglue-sdk/ios-arm64" \
+            -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build iOS app
+        run: |
+          cmake --build build-ios --config Release
+          APP_PATH="build-ios/Release-iphoneos/realrecompile.app"
+          if [ -d "$APP_PATH" ]; then
+            echo "iOS app bundle built: $APP_PATH"
+            ls -lh "$APP_PATH"
+            ls -lh "$APP_PATH/realrecompile" 2>/dev/null || true
+          else
+            echo "::warning::App bundle not found at expected path, checking build-ios..."
+            find build-ios -name "*.app" -o -name "realrecompile" | head -20
+          fi
+
+      - name: Upload iOS app
+        uses: actions/upload-artifact@v4
+        with:
+          name: realrecompile-ios-arm64
+          path: build-ios/Release-iphoneos/realrecompile.app

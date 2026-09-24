@@ -11,6 +11,7 @@ ReXGlue converts Xbox 360 PowerPC code into portable C++ that compiles to a nati
 - **GTK3** dev libraries (Linux)
 - **Vulkan** dev libraries
 - `default.xex` in project root
+- **Xcode 14+** (iOS, includes iOS SDK, Metal, and command line tools)
 
 ## Quick Start
 
@@ -39,10 +40,14 @@ ReXGlue converts Xbox 360 PowerPC code into portable C++ that compiles to a nati
 │   ├── realrecompile_init.cpp/h   # Function mapping table
 │   └── realrecompile_recomp.*.cpp # Recompiled PPC→x86 functions
 ├── src/app/main.cpp               # Application entry point (GTK+/Vulkan)
+├── src/app/main_android.cpp       # Application entry point (Android NativeActivity)
+├── src/app/main_ios.mm            # Application entry point (iOS UIKit)
 ├── CMakeLists.txt                 # Build system
-├── CMakePresets.json              # Build presets (Debug/Release)
+├── CMakePresets.json              # Build presets (Debug/Release, includes iOS)
 ├── scripts/
 │   ├── setup_rexglue_sdk.sh       # Download SDK
+│   ├── patch_sdk_ios.sh           # Patch SDK for iOS ARM64
+│   ├── patch_sdk_android.sh       # Patch SDK for Android ARM64
 │   ├── codegen.sh                 # Run code generation
 │   └── build.sh                   # Build executable
 └── third_party/rexglue-sdk/       # SDK (downloaded, gitignored)
@@ -54,6 +59,52 @@ ReXGlue converts Xbox 360 PowerPC code into portable C++ that compiles to a nati
 2. **Code generation**: Each PPC function is translated to a C++ function operating on a virtual PPC context
 3. **Compilation**: Generated C++ compiles with Clang to a ~31MB native executable
 4. **Runtime**: The rexglue runtime provides Xbox 360 kernel emulation, Vulkan-based GPU rendering, SDL2 input, and XMA audio decoding
+
+## iOS Build
+
+iOS builds require a Mac with Xcode 14+ and the iOS SDK.
+
+### Prerequisites
+
+- **Xcode 14+** with command line tools (`xcode-select --install`)
+- **CMake 3.25+** and **Ninja** (`brew install cmake ninja`)
+- `default.xex` in project root
+
+### Steps
+
+```bash
+# 1. Download rexglue-sdk for iOS
+TARGET=ios ./scripts/setup_rexglue_sdk.sh
+
+# 2. Patch SDK for iOS ARM64
+./scripts/patch_sdk_ios.sh third_party/rexglue-sdk/ios-arm64
+
+# 3. Generate C++ from XEX (run on host macOS)
+./scripts/codegen.sh
+
+# 4. Build for iOS
+TARGET=ios BUILD_TYPE=Release ./scripts/build.sh
+
+# 5. The app bundle will be at:
+# build/realrecompile.app
+```
+
+### Deploy to Device
+
+```bash
+# Install to connected device (requires signing)
+ios-deploy --bundle build/realrecompile.app
+
+# Or open in Xcode for signing and deployment
+open build/realrecompile.xcodeproj
+```
+
+### Notes
+
+- Code signing is disabled by default. Enable it in Xcode for App Store deployment.
+- `default.xex` is loaded from the app's Documents directory on first launch.
+- Vulkan rendering uses MoltenVK (included in rexglue-sdk).
+- Touch input is mapped to Xbox controller input via the rexglue runtime.
 
 ## CI
 

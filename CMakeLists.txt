@@ -18,6 +18,8 @@ else()
         set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/win-amd64")
     elseif(ANDROID)
         set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/android-arm64")
+    elseif(IOS)
+        set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/ios-arm64")
     else()
         set(_BUNDLED_SDK "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64")
     endif()
@@ -44,6 +46,9 @@ set(APP_SOURCES)
 if(ANDROID)
     # Android uses NativeActivity, not the windowed app framework
     list(APPEND APP_SOURCES src/app/main_android.cpp)
+elseif(IOS)
+    # iOS uses UIKit/UIApplication, not the windowed app framework
+    list(APPEND APP_SOURCES src/app/main_ios.mm)
 elseif(WIN32)
     list(APPEND APP_SOURCES src/app/main.cpp)
     list(APPEND APP_SOURCES ${REXGLUE_SHARE_DIR}/windowed_app_main_win.cpp)
@@ -65,6 +70,18 @@ endif()
 if(ANDROID)
     # Build as shared library for NativeActivity
     add_library(realrecompile SHARED ${APP_SOURCES})
+elseif(IOS)
+    add_executable(realrecompile ${APP_SOURCES})
+    set_target_properties(realrecompile PROPERTIES
+        MACOSX_BUNDLE TRUE
+        MACOSX_BUNDLE_BUNDLE_NAME "realrecompile"
+        MACOSX_BUNDLE_BUNDLE_VERSION "1.0"
+        MACOSX_BUNDLE_SHORT_VERSION_STRING "1.0"
+        XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED "NO"
+        XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED "NO"
+        XCODE_ATTRIBUTE_CODE_SIGNING_IDENTITY ""
+        XCODE_ATTRIBUTE_DEVELOPMENT_TEAM ""
+    )
 elseif(WIN32)
     add_executable(realrecompile WIN32 ${APP_SOURCES})
 else()
@@ -104,6 +121,51 @@ if(ANDROID)
     # Allow unresolved Xbox kernel symbols
     target_link_options(realrecompile PRIVATE -Wl,--unresolved-symbols=ignore-in-object-files)
 
+elseif(IOS)
+    # iOS ARM64 - Vulkan via MoltenVK, UIKit app lifecycle
+    find_library(UIKIT_LIB UIKit)
+    find_library(FOUNDATION_LIB Foundation)
+    find_library(COREGRAPHICS_LIB CoreGraphics)
+    find_library(METAL_LIB Metal)
+    find_library(METALKIT_LIB MetalKit)
+    find_library(GAME_CONTROLLER_LIB GameController)
+    target_link_libraries(realrecompile PRIVATE
+        ${UIKIT_LIB} ${FOUNDATION_LIB} ${COREGRAPHICS_LIB}
+        ${METAL_LIB} ${METALKIT_LIB} ${GAME_CONTROLLER_LIB}
+    )
+
+    target_compile_options(realrecompile PRIVATE
+        -O3
+        -flto=thin
+        -fomit-frame-pointer
+        -fvectorize
+        -fslp-vectorize
+        -march=armv8-a
+        -mtune=apple-a17
+    )
+
+    target_link_options(realrecompile PRIVATE
+        -O3
+        -flto=thin
+    )
+
+    target_compile_definitions(realrecompile PRIVATE
+        REX_PLATFORM_IOS=1
+    )
+
+    # Strip debug symbols in Release for smaller binary + better cache behavior
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+        target_link_options(realrecompile PRIVATE -Wl,-S)
+        set_target_properties(realrecompile PROPERTIES
+            XCODE_ATTRIBUTE_DEAD_CODE_STRIPPING "YES"
+            XCODE_ATTRIBUTE_STRIP_INSTALLED_PRODUCT "YES"
+            XCODE_ATTRIBUTE_STRIP_STYLE "all"
+        )
+    endif()
+
+    # Allow unresolved Xbox kernel symbols
+    target_link_options(realrecompile PRIVATE -Wl,-undefined,dynamic_lookup)
+
 elseif(UNIX AND NOT APPLE)
     # GTK3 for entry point (windowed_app_main_posix.cpp)
     find_package(PkgConfig REQUIRED)
@@ -125,7 +187,7 @@ elseif(UNIX AND NOT APPLE)
     target_link_options(realrecompile PRIVATE -Wl,--unresolved-symbols=ignore-in-object-files)
 endif()
 
-if(NOT MSVC AND NOT ANDROID)
+if(NOT MSVC AND NOT ANDROID AND NOT IOS)
     target_compile_options(realrecompile PRIVATE -msse4.1)
 endif()
 
@@ -156,12 +218,25 @@ endif()
 
 # ---------- Codegen convenience target ----------
 # Run: cmake --build build --target run-codegen
-if(NOT ANDROID)
+set(REXGLUE_CODEGEN_BIN "")
+if(DEFINED ENV{REXGLUE})
+    set(REXGLUE_CODEGEN_BIN "$ENV{REXGLUE}")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64/bin/rexglue")
+    set(REXGLUE_CODEGEN_BIN "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64/bin/rexglue")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/macos-amd64/bin/rexglue")
+    set(REXGLUE_CODEGEN_BIN "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/macos-amd64/bin/rexglue")
+elseif(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/win-amd64/bin/rexglue.exe")
+    set(REXGLUE_CODEGEN_BIN "${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/win-amd64/bin/rexglue.exe")
+endif()
+
+if(REXGLUE_CODEGEN_BIN)
     add_custom_target(run-codegen
-        COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/third_party/rexglue-sdk/linux-amd64/bin/rexglue
+        COMMAND ${REXGLUE_CODEGEN_BIN}
                 codegen ${CMAKE_CURRENT_SOURCE_DIR}/realrecompile_config.toml
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
         COMMENT "Generating recompiled C++ code from XEX"
         VERBATIM
     )
+else()
+    message(STATUS "rexglue codegen target not available - install SDK and set REXGLUE env var")
 endif()
