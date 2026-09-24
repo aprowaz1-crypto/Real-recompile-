@@ -1,7 +1,8 @@
 #!/bin/bash
-# Patch rexglue-sdk source for iOS ARM64
-# Usage: ./patch_sdk_ios.sh <sdk-source-dir>
-set -e
+set -euo pipefail
+set -x
+trap 'echo "ERROR: patch_sdk_ios.sh failed at line $LINENO with exit code $?" >&2' ERR
+
 SDK_DIR="${1:-.}"
 
 echo "Patching rexglue-sdk for iOS ARM64..."
