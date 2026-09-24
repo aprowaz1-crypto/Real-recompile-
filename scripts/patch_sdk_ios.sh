@@ -1,5 +1,5 @@
 #!/bin/bash
-set -euo pipefail
+set -eo pipefail
 set -x
 trap 'echo "ERROR: patch_sdk_ios.sh failed at line $LINENO with exit code $?" >&2' ERR
 
@@ -14,23 +14,19 @@ import re
 f = "${SDK_DIR}/CMakeLists.txt"
 text = open(f).read()
 
-# Remove x64 arch enforcement
 text = re.sub(r'# Enforce x64 architecture\n.*?endif\(\)\n', '', text, flags=re.DOTALL)
 print("  1. Removed x64 arch check")
 
-# Make -mcmodel=large conditional (not for ARM)
 text = text.replace(
     '    add_compile_options(-mcmodel=large)',
     '    if(NOT ANDROID AND NOT IOS)\n        add_compile_options(-mcmodel=large)\n    endif()')
 print("  2. Made -mcmodel=large conditional")
 
-# Add iOS platform detection
 text = text.replace(
     '    set(REX_PLATFORM "linux-amd64")\n    add_compile_definitions(REX_PLATFORM_LINUX=1)',
     '    if(ANDROID)\n        set(REX_PLATFORM "android-arm64")\n        add_compile_definitions(REX_PLATFORM_ANDROID=1 REX_PLATFORM_LINUX=1)\n    elseif(IOS)\n        set(REX_PLATFORM "ios-arm64")\n        add_compile_definitions(REX_PLATFORM_IOS=1)\n    else()\n        set(REX_PLATFORM "linux-amd64")\n        add_compile_definitions(REX_PLATFORM_LINUX=1)\n    endif()')
 print("  3. Added iOS platform detection")
 
-# iOS bionic/pthread setup
 thread_setup = '''
 # iOS includes pthreads - no separate library needed
 if(IOS)
@@ -40,6 +36,7 @@ if(IOS)
   set(THREADS_PREFER_PTHREAD_FLAG OFF CACHE BOOL "" FORCE)
 endif()
 '''
+import re
 text = re.sub(r'(project\([^)]+\))', r'\1' + thread_setup, text, count=1)
 print("  3b. Added iOS Threads setup in root CMakeLists.txt")
 
